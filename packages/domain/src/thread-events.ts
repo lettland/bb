@@ -32,8 +32,6 @@ export const systemEventTypeValues = [
   "system/permissionGrant/lifecycle",
   "system/userQuestion/lifecycle",
   "system/thread-provisioning",
-  // Legacy persisted watchdog diagnostic; retained for read/decode/render
-  // only, with no current producer.
   "system/provider-turn-watchdog",
 ] as const;
 
@@ -200,6 +198,20 @@ export const systemUserQuestionLifecycleEventDataSchema = z.object({
   payload: userQuestionPendingInteractionPayloadSchema,
 });
 
+const systemThreadInterruptedReasonValues = [
+  "manual-stop",
+  "host-daemon-restarted",
+  "host-removed",
+  "provider-turn-idle",
+  "question-unanswered",
+] as const;
+export const systemThreadInterruptedReasonSchema = z.enum(
+  systemThreadInterruptedReasonValues,
+);
+export type SystemThreadInterruptedReason = z.infer<
+  typeof systemThreadInterruptedReasonSchema
+>;
+
 export const systemThreadInterruptedEventDataSchema = z.object({
   reason: systemThreadInterruptedReasonSchema,
   cause: z.literal("host-connection-lost").optional(),
@@ -248,8 +260,17 @@ export const systemLegacyUserMessageEventDataSchema = z.object({
   turnId: z.string().optional(),
 });
 
+const providerTurnWatchdogActionValues = ["notify", "interrupt"] as const;
+export const providerTurnWatchdogActionSchema = z.enum(
+  providerTurnWatchdogActionValues,
+);
+export type ProviderTurnWatchdogAction = z.infer<
+  typeof providerTurnWatchdogActionSchema
+>;
+
 export const systemProviderTurnWatchdogEventDataSchema = z.object({
   reason: z.literal("provider-turn-idle"),
+  action: providerTurnWatchdogActionSchema.default("notify"),
   thresholdMs: z.number().int().positive(),
   elapsedMs: z.number().int().nonnegative(),
   activeTurnId: z.string().min(1),
@@ -261,3 +282,6 @@ export const systemProviderTurnWatchdogEventDataSchema = z.object({
   providerThreadId: z.string().min(1).nullable(),
   firedAt: z.number().int().nonnegative(),
 });
+export type SystemProviderTurnWatchdogEventData = z.infer<
+  typeof systemProviderTurnWatchdogEventDataSchema
+>;

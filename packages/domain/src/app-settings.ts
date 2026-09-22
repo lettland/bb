@@ -6,6 +6,10 @@ export const MANAGED_BRANCH_PREFIX_MAX_LENGTH = 64;
 
 export const DEFAULT_MANAGED_BRANCH_PREFIX = "bb/";
 
+export const PROVIDER_TURN_IDLE_WATCHDOG_MIN_MS = 5 * 60_000;
+export const DEFAULT_PROVIDER_TURN_IDLE_NOTIFY_MS = 6 * 60 * 60_000;
+export const DEFAULT_PROVIDER_TURN_IDLE_INTERRUPT_MS = 12 * 60 * 60_000;
+
 export const managedBranchPrefixSchema = z
   .string()
   .max(MANAGED_BRANCH_PREFIX_MAX_LENGTH)
@@ -43,6 +47,17 @@ export const appSettingsSchema = z
       .nullable(),
     machineGitCredentialsEnabled: z.boolean(),
     defaultMachineAccess: z.string().min(1).nullable(),
+    providerTurnIdleWatchdogEnabled: z.boolean(),
+    providerTurnIdleNotifyMs: z
+      .number()
+      .int()
+      .finite()
+      .min(PROVIDER_TURN_IDLE_WATCHDOG_MIN_MS),
+    providerTurnIdleInterruptMs: z
+      .number()
+      .int()
+      .finite()
+      .min(PROVIDER_TURN_IDLE_WATCHDOG_MIN_MS),
   })
   .strict();
 export type AppSettings = z.infer<typeof appSettingsSchema>;
@@ -62,22 +77,35 @@ export const defaultAppSettings: AppSettings = {
   machineServerUrl: null,
   defaultMachineAccess: null,
   machineGitCredentialsEnabled: true,
+  providerTurnIdleWatchdogEnabled: true,
+  providerTurnIdleNotifyMs: DEFAULT_PROVIDER_TURN_IDLE_NOTIFY_MS,
+  providerTurnIdleInterruptMs: DEFAULT_PROVIDER_TURN_IDLE_INTERRUPT_MS,
 };
 
 export const disabledProviderIdsSchema = z.array(z.string().min(1));
 
-export const appSettingsUpdateSchema = z.union([
-  appSettingsSchema.extend({
-    allowFastServiceTier: z.boolean().optional(),
-    telemetryEnabled: z.boolean().optional(),
-    confirmThreadArchive: z.boolean().optional(),
-    showUnhandledProviderEvents: z.boolean().optional(),
-  }),
-  appSettingsSchema.omit({ showDiagnosticEvents: true }).extend({
-    allowFastServiceTier: z.boolean().optional(),
-    telemetryEnabled: z.boolean().optional(),
-    confirmThreadArchive: z.boolean().optional(),
-    showUnhandledProviderEvents: z.boolean(),
-  }),
-]);
+export const appSettingsUpdateSchema = z
+  .union([
+    appSettingsSchema.extend({
+      allowFastServiceTier: z.boolean().optional(),
+      telemetryEnabled: z.boolean().optional(),
+      confirmThreadArchive: z.boolean().optional(),
+      showUnhandledProviderEvents: z.boolean().optional(),
+    }),
+    appSettingsSchema.omit({ showDiagnosticEvents: true }).extend({
+      allowFastServiceTier: z.boolean().optional(),
+      telemetryEnabled: z.boolean().optional(),
+      confirmThreadArchive: z.boolean().optional(),
+      showUnhandledProviderEvents: z.boolean(),
+    }),
+  ])
+  .superRefine((value, ctx) => {
+    if (value.providerTurnIdleInterruptMs <= value.providerTurnIdleNotifyMs) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["providerTurnIdleInterruptMs"],
+        message: `providerTurnIdleInterruptMs (${value.providerTurnIdleInterruptMs}) must be greater than providerTurnIdleNotifyMs (${value.providerTurnIdleNotifyMs})`,
+      });
+    }
+    });
 export type AppSettingsUpdate = z.infer<typeof appSettingsUpdateSchema>;

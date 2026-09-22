@@ -84,7 +84,9 @@ export function createClientDelivery(navigate: (threadId: string) => void) {
       const key = `bb.push-notifications.seen.${channel}`;
       let ids: string[] = [];
       try {
-        const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+        const stored: unknown = JSON.parse(
+          window.localStorage.getItem(key) ?? "[]",
+        );
         ids = Array.isArray(stored)
           ? stored.filter((id): id is string => typeof id === "string")
           : [];
@@ -94,7 +96,7 @@ export function createClientDelivery(navigate: (threadId: string) => void) {
       }
       display(message);
       try {
-        localStorage.setItem(
+        window.localStorage.setItem(
           key,
           JSON.stringify([...ids.slice(-99), message.id]),
         );

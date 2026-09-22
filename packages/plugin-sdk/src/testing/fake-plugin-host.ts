@@ -1141,6 +1141,7 @@ function createFakePluginHostInternal(
     "turn.failed": [],
     "message.cancelled": [],
     "thread.unarchived": [],
+    "experimental_thread.turnWatchdog": [],
   };
   const hooks: {
     [K in PluginHookName]: PluginHookHandler<K> | null;
@@ -1651,6 +1652,8 @@ function createFakePluginHostInternal(
           "turn.failed": threadEventHandlers["turn.failed"].length,
           "message.cancelled": threadEventHandlers["message.cancelled"].length,
           "thread.unarchived": threadEventHandlers["thread.unarchived"].length,
+          "experimental_thread.turnWatchdog":
+            threadEventHandlers["experimental_thread.turnWatchdog"].length,
         };
       },
       get hooks() {

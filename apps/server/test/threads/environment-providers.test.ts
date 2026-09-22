@@ -2792,6 +2792,7 @@ describe("a provider-produced environment over its life", () => {
         emitMessageCancelled: () => {},
         emitInteractionPending: () => {},
         emitTurnFailed: () => 0,
+        emitThreadTurnWatchdog: () => {},
       });
       try {
         const { environment, host, project, session } = seedTargetFixture(
