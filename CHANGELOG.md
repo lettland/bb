@@ -1,5 +1,9 @@
 # Changelog
 
+**Unreleased**
+
+- Add **Checkout, then branch** beside checkout-then-worktree. Threads can create or select a branch in the same checkout before editing, with shared-checkout admission checks and interrupted-operation recovery in metadata, SDK, and CLI (`--promote branch`).
+
 ## 0.45.0
 
 Thread titles and voice transcription without a Codex login, faster conversations, and new platforms in alpha.

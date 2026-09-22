@@ -87,6 +87,7 @@ export interface NewThreadEnvironmentConfig {
   onSelectProvider?: EnvironmentPickerUIProps["onSelectProvider"];
   onSelectHost?: EnvironmentPickerUIProps["onSelectHost"];
   onSelectReuse?: EnvironmentPickerUIProps["onSelectReuse"];
+  onSelectProjectDefault?: EnvironmentPickerUIProps["onSelectProjectDefault"];
 }
 
 export interface NewThreadWorktreeConfig {
@@ -437,6 +438,7 @@ export function EnvironmentSlot({
         onSelectProvider={environment.onSelectProvider}
         onSelectHost={environment.onSelectHost}
         onSelectReuse={environment.onSelectReuse}
+        onSelectProjectDefault={environment.onSelectProjectDefault}
         className="shrink-0"
         muted
       />

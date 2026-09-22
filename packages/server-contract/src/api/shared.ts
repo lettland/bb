@@ -111,6 +111,7 @@ export type EnvironmentArgs = z.infer<typeof environmentArgsSchema>;
 
 export const projectDefaultEnvironmentSchema = z.object({
   type: z.literal("project-default"),
+  promotion: z.enum(["worktree", "branch"]).optional(),
 });
 
 export const providerEnvironmentSchema = z.object({

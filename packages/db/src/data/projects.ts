@@ -1,4 +1,5 @@
 import { hostPathEquals } from "./host-path-sql.js";
+import { assertBranchPromotionsSettled } from "./branch-promotions.fork.js";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import type {
@@ -311,6 +312,7 @@ export function markProjectDeleted(
   notifier: DbNotifier,
   args: MarkProjectDeletedArgs,
 ) {
+  assertBranchPromotionsSettled(db, { projectId: args.projectId });
   const deletedAt = args.deletedAt ?? Date.now();
   const updated =
     db
@@ -413,6 +415,7 @@ export function deleteProject(
   notifier: DbNotifier,
   id: string,
 ) {
+  assertBranchPromotionsSettled(db, { projectId: id });
   const existing = db.select().from(projects).where(eq(projects.id, id)).get();
   if (!existing) return false;
   db.delete(projects).where(eq(projects.id, id)).run();

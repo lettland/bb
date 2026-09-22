@@ -1,3 +1,4 @@
+import { BranchPromotionRow } from "./BranchPromotionRow.fork";
 import { EnvironmentProviderIcon } from "@/components/plugin/EnvironmentProviderIcon";
 import {
   useCallback,
@@ -1076,6 +1077,7 @@ export function ThreadMetadataContent(props: ThreadMetadataContentProps) {
       <EnvironmentProvisioningFailureRow
         failed={environmentProvisioningFailure}
       />
+      <BranchPromotionRow thread={thread} />
       <WorkspacePathRow environment={environment} />
       {environment !== null && environment.hostLifecycle !== "active" ? null : (
         <>

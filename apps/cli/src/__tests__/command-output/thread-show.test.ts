@@ -55,7 +55,11 @@ describe("bb thread show command output", () => {
   it.each([
     {
       flag: "archived",
-      stamp: { archivedAt: 1_700_000_000_000 },
+      stamp: {
+        archivedAt: 1_700_000_000_000,
+        promotionTarget: "branch" as const,
+        worktreePromotion: "armed" as const,
+      },
       label: "Archived:",
     },
     {
@@ -93,6 +97,10 @@ describe("bb thread show command output", () => {
       });
       const lines = collectLogLines(vi.mocked(console.log));
       expect(lines.some((line) => line.includes(label))).toBe(true);
+      if (flag === "archived") {
+        expect(lines).toContain("  Promotion target: branch");
+        expect(lines).toContain("  Promotion state: armed");
+      }
     },
   );
 

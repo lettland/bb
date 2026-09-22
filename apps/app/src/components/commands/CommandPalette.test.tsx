@@ -300,6 +300,8 @@ function makeThread(
     originKind: null,
     originPluginId: null,
     visibility: "visible",
+    worktreePromotion: "declined",
+    promotionTarget: "worktree",
     archivedAt: null,
     pinnedAt: null,
     pinSortKey: null,

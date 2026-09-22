@@ -1,3 +1,8 @@
+import {
+  branchPromotionRequestSchema,
+  type BranchPromotionRequest,
+  type BranchPromotionSnapshot,
+} from "bb-checkout-contract/branch-promotion";
 import { setTimeout as delay } from "node:timers/promises";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type {
@@ -33,6 +38,7 @@ const DIRTY_MESSAGE = "Checkout blocked by uncommitted changes";
 export const checkoutInputsSchema = z.object({
   path: z.string().min(1).optional(),
   branch: checkoutBranchSelectionSchema.optional(),
+  promotion: branchPromotionRequestSchema.optional(),
 });
 
 type CheckoutOperation = Pick<
@@ -49,6 +55,88 @@ type CheckoutOperation = Pick<
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function claimCheckoutPath(
+  context: CheckoutOperation,
+  path: string,
+  hasBranch: boolean,
+): Promise<boolean> {
+  const deadline = Date.now() + ATTACH_TIMEOUT_MS;
+  while (!(await context.experimental_claimPath(path))) {
+    context.signal.throwIfAborted();
+    if (hasBranch || Date.now() >= deadline) return false;
+    await delay(50, undefined, { signal: context.signal });
+  }
+  return true;
+}
+
+function resolveCheckoutBranch(
+  branch: CheckoutBranchSelection | undefined,
+  suggestedName: string,
+): CheckoutBranch | null {
+  if (branch === undefined) return null;
+  if (branch.kind === "existing") return branch;
+  return { kind: "new", name: suggestedName, baseBranch: branch.baseBranch };
+}
+
+async function checkoutCreateBlocker(
+  context: CheckoutOperation,
+  path: string,
+  hasBranch: boolean,
+  liveThreadUsesPath: () => Promise<boolean>,
+): Promise<string | null> {
+  if (!(await claimCheckoutPath(context, path, hasBranch)))
+    return "Workspace is being prepared by another thread";
+  return hasBranch && (await liveThreadUsesPath()) ? LIVE_THREAD_MESSAGE : null;
+}
+
+async function createPromotion(args: {
+  context: PluginEnvironmentProviderCreateContext<
+    { projectCheckout: true },
+    typeof checkoutInputsSchema
+  >;
+  promotion: BranchPromotionRequest;
+  reports: Map<string, PluginEnvironmentProviderProgress>;
+  liveThreadUsesPath(): Promise<boolean>;
+  call(request: BranchPromotionRequest): Promise<BranchPromotionSnapshot>;
+}): Promise<PluginEnvironmentProviderCreateResult> {
+  const { context, promotion, reports } = args;
+  if (
+    context.inputs.path !== undefined ||
+    context.inputs.branch !== undefined
+  ) {
+    return {
+      status: "failed",
+      message: "Promotion cannot be combined with checkout inputs",
+    };
+  }
+  if (!(await context.experimental_claimPath(promotion.intent.path))) {
+    return {
+      status: "failed",
+      message: "Branch promotion reservation is no longer held",
+    };
+  }
+  const blocked =
+    promotion.action === "enter" && (await args.liveThreadUsesPath());
+  const operationId = promotion.intent.operationId;
+  reports.set(operationId, context.report);
+  try {
+    const result = await args.call(
+      blocked ? { action: "inspect", intent: promotion.intent } : promotion,
+    );
+    return {
+      status: "created",
+      path: promotion.intent.path,
+      ownsPath: false,
+      resource: blocked ? { ...result, message: LIVE_THREAD_MESSAGE } : result,
+    };
+  } catch (error) {
+    if (context.signal.aborted) throw error;
+    return { status: "failed", message: errorMessage(error) };
+  } finally {
+    reports.delete(operationId);
+  }
 }
 
 export default async function checkoutPlugin(bb: BbPluginApi): Promise<void> {
@@ -161,27 +249,14 @@ export default async function checkoutPlugin(bb: BbPluginApi): Promise<void> {
   ): Promise<PluginEnvironmentProviderCreateResult> {
     const hostId = context.host.id;
     const { path, branch } = target;
-    const claimDeadline = Date.now() + ATTACH_TIMEOUT_MS;
-    while (!(await context.experimental_claimPath(path))) {
-      context.signal.throwIfAborted();
-      if (branch !== null || Date.now() >= claimDeadline) {
-        return {
-          status: "failed",
-          message: "Workspace is being prepared by another thread",
-        };
-      }
-      await delay(50, undefined, { signal: context.signal });
-    }
-    if (
-      branch !== null &&
-      (await otherLiveThreadUsesPath({
+    const blocker = await checkoutCreateBlocker(context, path, branch !== null, () =>
+      otherLiveThreadUsesPath({
         hostId,
         path,
         threadId: context.thread.id,
-      }))
-    ) {
-      return { status: "failed", message: LIVE_THREAD_MESSAGE };
-    }
+      }),
+    );
+    if (blocker !== null) return { status: "failed", message: blocker };
     const operationId = `${context.pathKey}#${context.attempt}`;
     reports.set(operationId, context.report);
     try {
@@ -219,6 +294,13 @@ export default async function checkoutPlugin(bb: BbPluginApi): Promise<void> {
     experimental_existingPath: (inputs) =>
       inputs.branch === undefined ? (inputs.path ?? null) : null,
     async validate(context) {
+      if (context.inputs.promotion !== undefined) {
+        return {
+          action: "refuse",
+          message:
+            "Branch promotion is reserved for the internal promotion workflow",
+        };
+      }
       const branch = context.inputs.branch;
       const path = context.inputs.path ?? context.projectCheckout.path;
       const foreignEnvironmentId = await foreignEnvironmentAtPath({
@@ -253,19 +335,33 @@ export default async function checkoutPlugin(bb: BbPluginApi): Promise<void> {
         : { action: "refuse", message: blocker };
     },
     async create(context) {
-      const branchInput = context.inputs.branch;
+      const hostId = context.host.id;
+      const promotion = context.inputs.promotion;
+      if (promotion !== undefined) {
+        return createPromotion({
+          context,
+          promotion,
+          reports,
+          liveThreadUsesPath: () =>
+            otherLiveThreadUsesPath({
+              hostId,
+              path: promotion.intent.path,
+              threadId: context.thread.id,
+            }),
+          call: (request) =>
+            host.call("promoteBranch", request, {
+              hostId,
+              signal: context.signal,
+              timeoutMs: ATTACH_TIMEOUT_MS,
+            }),
+        });
+      }
       return attachWorkspace(context, {
         path: context.inputs.path ?? context.projectCheckout.path,
-        branch:
-          branchInput === undefined
-            ? null
-            : branchInput.kind === "existing"
-              ? { kind: "existing", name: branchInput.name }
-              : {
-                  kind: "new",
-                  name: context.suggestedBranchName,
-                  baseBranch: branchInput.baseBranch,
-                },
+        branch: resolveCheckoutBranch(
+          context.inputs.branch,
+          context.suggestedBranchName,
+        ),
       });
     },
     async restore(context) {
