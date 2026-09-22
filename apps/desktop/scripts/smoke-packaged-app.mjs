@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   createDesktopReleaseConfig,
   resolveDesktopBuildPlatform,
-  resolveDesktopReleaseChannel,
+  resolveDesktopBuildSettings,
 } from "./desktop-release-channel.mjs";
 import { createPackagedAppLaunchArguments } from "./packaged-app-launch.mjs";
 import { resolvePackagedAppBinary } from "./packaged-app-paths.mjs";
@@ -18,8 +18,8 @@ import { smokePackagedNpm } from "./smoke-packaged-npm.mjs";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const desktopPackageRoot = resolve(scriptDirectory, "..");
 const releaseDir = join(desktopPackageRoot, "release");
-const releaseChannel = resolveDesktopReleaseChannel(process.env);
-const releaseConfig = createDesktopReleaseConfig(releaseChannel);
+const { localBuild, releaseChannel } = resolveDesktopBuildSettings(process.env);
+const releaseConfig = createDesktopReleaseConfig(releaseChannel, localBuild);
 const startupTimeoutMs = 20_000;
 const exitTimeoutMs = 5_000;
 const outputFlushTimeoutMs = 2_000;
