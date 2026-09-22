@@ -6,8 +6,9 @@ description: "Inspect or change the sidebar thread list's layout preferences: or
 # Thread list preferences
 
 The Thread list plugin owns the sidebar's layout state. Read it with
-`bb thread-list prefs list --json`; keys are `showProviderIcons`, `threadLifecycles`, `organizationMode`,
-`environmentGrouping`, `groupByReadStatus`, `chronologicalSort`, `sortDirection`, `sectionOrder`,
+`bb thread-list prefs list --json`; keys are `showProviderIcons`, `threadLifecycles`,
+`organizationMode`, `environmentGrouping`, `groupByReadStatus`, `chronologicalSort`,
+`sortDirection`, `projectSort`, `projectSortDirection`, `sectionOrder`,
 `manualSectionOrder`, `machineSectionOrder`, `hiddenGroups` (including the
 built-in `threads` group), `rowActions`,
 `collapsedSections`, `collapsedProjects`, `collapsedThreads`,
@@ -63,3 +64,9 @@ and general thread groups start unsectioned and unpinned. Environment rows
 reuse their environment and the containing group's placement. In Pinned,
 they retain the group's common underlying section for unpinning; mixed-section
 groups use no underlying section.
+
+Thread sorting and project sorting are independent. `chronologicalSort` and
+`sortDirection` order threads within project rows. `projectSort` accepts
+`custom`, `alpha`, or `activity`; `projectSortDirection` controls automatic
+project order without changing the stored drag order. Recent activity is the
+latest visible, non-archived thread update in each project.
