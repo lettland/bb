@@ -539,6 +539,20 @@ const ONLINE_RPC_RESPONSE_RESULT_FIXTURES: OnlineRpcResponseResultFixtures = {
 };
 
 const SETTLED_RESPONSE_RESULT_FIXTURES: SettledResponseResultFixtures = {
+  "work.quiesce": {
+    operationId: "update-1",
+    gatePhase: "draining",
+    activity: { activeByKind: { thread: 1 } },
+  },
+  "work.seal": {
+    operationId: "update-1",
+    gatePhase: "sealed",
+    activity: { activeByKind: {} },
+  },
+  "work.unquiesce": {
+    operationId: "update-1",
+    released: true,
+  },
   "thread.rewind.discard": {},
   "thread.rewind.prepare": {
     providerThreadId: "provider-thread-rewind",
@@ -1212,6 +1226,31 @@ describe("host-daemon command schemas", () => {
       );
     },
   );
+  it("round-trips lease-scoped work barrier commands", () => {
+    expect(
+      hostDaemonCommandSchema.parse({
+        type: "work.quiesce",
+        operationId: "update-1",
+        expiresAt: 1_700_000_060_000,
+      }),
+    ).toEqual({
+      type: "work.quiesce",
+      operationId: "update-1",
+      expiresAt: 1_700_000_060_000,
+    });
+    expect(
+      hostDaemonCommandSchema.parse({
+        type: "work.seal",
+        operationId: "update-1",
+      }),
+    ).toEqual({ type: "work.seal", operationId: "update-1" });
+    expect(
+      hostDaemonCommandSchema.parse({
+        type: "work.unquiesce",
+        operationId: "update-1",
+      }),
+    ).toEqual({ type: "work.unquiesce", operationId: "update-1" });
+  });
 
   it("uses relative host-plugin timeouts and bounds artifact declarations", () => {
     const command = {

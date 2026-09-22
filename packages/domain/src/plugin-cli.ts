@@ -6,6 +6,8 @@ export const RESERVED_BB_CLI_COMMANDS: readonly string[] = [
   "guide",
   "help",
   "machine",
+  "maintenance",
+  "manager",
   "marketplace",
   "plugin",
   "project",

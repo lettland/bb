@@ -225,6 +225,7 @@ export class NotificationHub implements DbNotifier {
     {
       heardSinceLivenessCheck: boolean;
       hostId: string;
+      dispatchable: boolean;
       localApiPort: number | null;
       platform: HostPlatform;
       quietLivenessChecks: number;
@@ -553,7 +554,12 @@ export class NotificationHub implements DbNotifier {
     this.daemonSessionLocalApiPortsBySessionId.set(sessionId, localApiPort);
   }
 
-  registerDaemon(sessionId: string, hostId: string, socket: HubSocket): void {
+  registerDaemon(
+    sessionId: string,
+    hostId: string,
+    socket: HubSocket,
+    options: { dispatchable?: boolean } = {},
+  ): void {
     this.cancelPendingDaemonDisconnect(sessionId);
     const existingSessionId = this.daemonSessionIdsByHost.get(hostId);
     if (existingSessionId && existingSessionId !== sessionId) {
@@ -563,6 +569,7 @@ export class NotificationHub implements DbNotifier {
     this.daemonSessions.set(sessionId, {
       heardSinceLivenessCheck: true,
       hostId,
+      dispatchable: options.dispatchable ?? true,
       localApiPort:
         this.daemonSessionLocalApiPortsBySessionId.get(sessionId) ?? null,
       platform:
@@ -571,8 +578,10 @@ export class NotificationHub implements DbNotifier {
       socket,
     });
     this.daemonSessionIdsByHost.set(hostId, sessionId);
-    this.resolveDaemonRegistrationWaiters(hostId);
-    this.notifyHost(hostId, ["host-connected"]);
+    if (options.dispatchable ?? true) {
+      this.resolveDaemonRegistrationWaiters(hostId);
+      this.notifyHost(hostId, ["host-connected"]);
+    }
   }
 
   unregisterDaemon(sessionId: string): void {
@@ -622,12 +631,26 @@ export class NotificationHub implements DbNotifier {
 
   hasDaemonForHost(hostId: string): boolean {
     const sessionId = this.daemonSessionIdsByHost.get(hostId);
-    return sessionId !== undefined && this.daemonSessions.has(sessionId);
+    return (
+      sessionId !== undefined &&
+      this.daemonSessions.get(sessionId)?.dispatchable === true
+    );
+  }
+
+  markDaemonDispatchable(sessionId: string): void {
+    const session = this.daemonSessions.get(sessionId);
+    if (!session) return;
+    session.dispatchable = true;
+    this.resolveDaemonRegistrationWaiters(session.hostId);
+    this.notifyHost(session.hostId, ["host-connected"]);
   }
 
   getDaemonSessionIdForHost(hostId: string): string | null {
     const sessionId = this.daemonSessionIdsByHost.get(hostId);
-    if (!sessionId || !this.daemonSessions.has(sessionId)) {
+    if (
+      !sessionId ||
+      this.daemonSessions.get(sessionId)?.dispatchable !== true
+    ) {
       return null;
     }
     return sessionId;
@@ -755,13 +778,14 @@ export class NotificationHub implements DbNotifier {
     hostId: string;
     message: HostDaemonOnlineRpcRequestMessage;
     timeoutMs: number;
+    allowUndispatchable?: boolean;
   }): Promise<HostDaemonOnlineRpcResponseMessage> {
     const sessionId = this.daemonSessionIdsByHost.get(args.hostId);
     if (!sessionId) {
       return Promise.reject(new HostOnlineRpcUnavailableError());
     }
     const session = this.daemonSessions.get(sessionId);
-    if (!session) {
+    if (!session || (!session.dispatchable && !args.allowUndispatchable)) {
       return Promise.reject(new HostOnlineRpcUnavailableError());
     }
 
