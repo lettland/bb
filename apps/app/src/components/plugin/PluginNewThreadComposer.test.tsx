@@ -98,6 +98,8 @@ const mocks = vi.hoisted(() => ({
   machineProviders: [] as SystemMachineProvider[],
   modelsLoading: false,
   permissionCeiling: undefined as "accept-edits" | "auto" | "full" | undefined,
+  defaultProviderId: null as string | null,
+  projectDefaultsQuery: { data: undefined } as Record<string, unknown>,
 }));
 
 vi.mock("@/views/RootComposePanelCommandHandlers", () => ({
@@ -264,7 +266,10 @@ vi.mock("@/hooks/queries/system-queries", () => ({
   useSystemConfig: () => ({
     data: {
       primaryHostId: "host_1",
-      generalSettings: defaultAppSettings,
+      generalSettings: {
+        ...defaultAppSettings,
+        defaultProviderId: mocks.defaultProviderId,
+      },
       serverAccess: {
         providers: [
           {
@@ -391,7 +396,7 @@ vi.mock("@/hooks/queries/project-queries", () => ({
 }));
 
 vi.mock("@/hooks/queries/project-default-execution-options-query", () => ({
-  useProjectDefaultExecutionOptions: () => ({ data: undefined }),
+  useProjectDefaultExecutionOptions: () => mocks.projectDefaultsQuery,
 }));
 
 vi.mock("@/hooks/mutations/project-mutations", () => ({
@@ -2702,6 +2707,8 @@ describe("NewThreadComposer setSelection", () => {
   afterEach(() => {
     cleanup();
     setComposerSelectionSettleTimeoutForTest(null);
+    mocks.defaultProviderId = null;
+    mocks.projectDefaultsQuery = { data: undefined };
     vi.restoreAllMocks();
   });
 
@@ -2887,6 +2894,35 @@ describe("NewThreadComposer setSelection", () => {
     );
   });
 
+  it("opens a project without remembered defaults on the configured default provider", async () => {
+    window.localStorage.setItem("bb.promptbox.provider", "codex");
+    mocks.defaultProviderId = "claude-code";
+    mocks.projectDefaultsQuery = {
+      data: null,
+      isSuccess: true,
+      isPlaceholderData: false,
+      isError: false,
+    };
+    mocks.extraProjects = [
+      {
+        ...PROJECT,
+        id: "proj_blank",
+        name: "Project Blank",
+        defaultExecutionOptions: null,
+        sources: [
+          { ...PROJECT.sources[0], id: "src_blank", projectId: "proj_blank" },
+        ],
+      },
+    ];
+    render(rootLikeElement("proj_blank"));
+
+    await waitFor(() => {
+      expect(latestPromptBoxProps().execution.provider.selectedId).toBe(
+        "claude-code",
+      );
+    });
+  });
+
   it("applies the model to the requested provider only after the composer lands on it", async () => {
     render(rootLikeElement("proj_1"));
 
@@ -2918,7 +2954,7 @@ describe("NewThreadComposer setSelection", () => {
       model: "gpt-5.6-sol",
       reasoningLevel: "high",
     });
-    expect(window.localStorage.getItem("bb.promptbox.provider")).toBe(
+    expect(window.localStorage.getItem("bb.promptbox.provider-proj_1-1")).toBe(
       "claude-code",
     );
     expect(

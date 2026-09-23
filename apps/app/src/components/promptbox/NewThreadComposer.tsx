@@ -861,7 +861,12 @@ export function NewThreadComposer({
     preferenceProjectId: projectId,
     resetKey: `${projectId}\0${seedSignature}`,
     resolveProviderRouting,
-    initialProviderId: seed?.providerId ?? projectDefaults?.providerId,
+    initialProviderId:
+      seed?.providerId ??
+      (projectDefaults === null
+        ? (systemConfigQuery.data?.generalSettings.defaultProviderId ??
+          undefined)
+        : projectDefaults?.providerId),
     preferReadyProviderWhenUnset:
       preferReadyProviderWhenUnset && projectDefaults === null,
     initialModel: seed?.model ?? projectDefaults?.model,

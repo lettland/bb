@@ -193,4 +193,47 @@ describe("tab-local composer selections", () => {
     expect(result.current.environment.value).toBe("provider:git-worktree");
     expect(result.current.machine.value).toBe("host-b");
   });
+
+  it("keeps a separate provider per project without inheriting the global pick", () => {
+    window.localStorage.setItem("bb.promptbox.provider", "codex");
+    const store = createStore();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <Provider store={store}>{children}</Provider>
+    );
+    const { result, rerender } = renderHook(
+      ({ projectId }) => usePromptBoxProviderPreference(projectId),
+      { wrapper, initialProps: { projectId: "project-a" } },
+    );
+    expect(result.current.value).toBe("");
+    act(() => result.current.setValue("claude-code"));
+    rerender({ projectId: "project-b" });
+    expect(result.current.value).toBe("");
+    act(() => result.current.setValue("acp-claude-work"));
+    rerender({ projectId: "project-a" });
+    expect(result.current.value).toBe("claude-code");
+    expect(
+      window.localStorage.getItem("bb.promptbox.provider-project-a-1"),
+    ).toBe("claude-code");
+    expect(
+      window.localStorage.getItem("bb.promptbox.provider-project-b-1"),
+    ).toBe("acp-claude-work");
+    expect(window.localStorage.getItem("bb.promptbox.provider")).toBe("codex");
+  });
+
+  it("pins legacy provider model and reasoning before another tab changes the legacy owner", () => {
+    window.localStorage.setItem("bb.promptbox.provider", "codex");
+    window.localStorage.setItem("bb.promptbox.model", "legacy-model");
+    window.localStorage.setItem("bb.promptbox.reasoning", "high");
+    const first = renderSelections();
+    expect(first.result.current.model.value).toBe("legacy-model");
+    expect(first.result.current.reasoning.value).toBe("high");
+    first.unmount();
+    window.localStorage.setItem("bb.promptbox.provider", "claude-code");
+    window.localStorage.removeItem("bb.promptbox.model");
+    window.localStorage.removeItem("bb.promptbox.reasoning");
+    const reloaded = renderSelections();
+    expect(reloaded.result.current.provider.value).toBe("codex");
+    expect(reloaded.result.current.model.value).toBe("legacy-model");
+    expect(reloaded.result.current.reasoning.value).toBe("high");
+  });
 });
