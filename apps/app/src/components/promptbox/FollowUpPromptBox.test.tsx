@@ -747,6 +747,7 @@ describe("FollowUpPromptBox", () => {
         onStart: vi.fn(),
         onExit: vi.fn(),
         onSelect: vi.fn(),
+        onChangeTarget: vi.fn(),
       };
       props.execution.handoff = handoff;
       const { rerender } = render(<FollowUpPromptBox {...props} />);
@@ -768,10 +769,19 @@ describe("FollowUpPromptBox", () => {
       expect(exit.textContent).toBe("");
       fireEvent.click(exit);
       expect(handoff.onExit).toHaveBeenCalledOnce();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Change project or environment" }),
+      );
+      expect(handoff.onChangeTarget).toHaveBeenCalledOnce();
 
       rerender(<FollowUpPromptBox {...props} />);
       expect(screen.queryByRole("button", { name: "Exit handoff" })).toBeNull();
       expect(screen.getByLabelText("Follow-up prompt")).toBe(editor);
+      expect(
+        screen.queryByRole("button", {
+          name: "Change project or environment",
+        }),
+      ).toBeNull();
     },
   );
 

@@ -25,6 +25,7 @@ import type {
 } from "@bb/server-contract";
 import {
   NewThreadComposer,
+  type NewThreadComposerSeed,
   type NewThreadComposerState,
   type NewThreadComposerSubmission,
 } from "@/components/promptbox/NewThreadComposer";
@@ -90,6 +91,11 @@ import {
 import { PluginComposerHostProvider } from "@/components/plugin/plugin-composer-host";
 import type { PromptMentionLinkResolver } from "@/components/promptbox/editor/prompt-mention-link";
 import { useQuickCreateProjectController } from "@/hooks/useQuickCreateProject";
+import {
+  mergeThreadHandoffComposeDraft,
+  readThreadHandoffComposeSeedFromLocationState,
+  type ThreadHandoffComposeSeed,
+} from "@bb/client-core";
 import { useNavigateToThreadAfterCreatePreference } from "@/lib/root-compose-create-preference";
 import {
   readInitialPromptFromSearch,
@@ -137,6 +143,7 @@ import {
   toFilePreviewLineRange,
 } from "@/lib/live-file-navigation";
 import {
+  useRootComposeHandoffSeed,
   useRootComposeProjectId,
   useSetRootComposeProjectId,
 } from "@/lib/root-compose-selection";
@@ -331,11 +338,34 @@ export function readRootComposeEnvironmentTargetFromLocationState(
   return hostId === null ? null : { kind: "host", hostId };
 }
 
+export function buildHandoffComposerSeed(
+  handoffSeed: ThreadHandoffComposeSeed,
+  projectId: string,
+): NewThreadComposerSeed {
+  return {
+    providerId: handoffSeed.providerId,
+    model: handoffSeed.model,
+    reasoningLevel: handoffSeed.reasoningLevel,
+    serviceTier: handoffSeed.serviceTier,
+    permissionMode: handoffSeed.permissionMode,
+    ...(handoffSeed.environmentId !== null &&
+    projectId === handoffSeed.projectId
+      ? {
+          environment: {
+            type: "reuse" as const,
+            environmentId: handoffSeed.environmentId,
+          },
+        }
+      : {}),
+  };
+}
+
 export function hasSingleUseRootComposeTargetState(state: unknown): boolean {
   return (
     readThreadCreationPlacement(state) !== null ||
     readRootComposeSectionTargetFromLocationState(state) !== null ||
-    readRootComposeEnvironmentTargetFromLocationState(state) !== null
+    readRootComposeEnvironmentTargetFromLocationState(state) !== null ||
+    readThreadHandoffComposeSeedFromLocationState(state) !== null
   );
 }
 
@@ -457,9 +487,12 @@ export function RootComposeView() {
   );
   const [navigateToThreadAfterCreate] =
     useNavigateToThreadAfterCreatePreference();
+  const [handoffSeed, setHandoffSeed] = useRootComposeHandoffSeed();
 
   const handleSubmit = useCallback(
     async (request: NewThreadComposerSubmission) => {
+      const shouldNavigateToCreatedThread =
+        handoffSeed !== null || navigateToThreadAfterCreate;
       const { sendAt, ...requestFields } = request;
       const thread = await createThread.mutateAsync({
         ...requestFields,
@@ -467,18 +500,29 @@ export function RootComposeView() {
         ...(sendAt === undefined ? {} : { sendAt }),
       });
       setLastCreatedThreadId(thread.id);
+      setHandoffSeed(null);
       setPlacement(DEFAULT_THREAD_CREATION_PLACEMENT);
-      if (navigateToThreadAfterCreate) {
+      if (shouldNavigateToCreatedThread) {
         navigateInPane({ projectId: thread.projectId, threadId: thread.id });
       }
     },
     [
       createThread,
+      handoffSeed,
       navigateInPane,
       navigateToThreadAfterCreate,
       placement,
+      setHandoffSeed,
       setPlacement,
     ],
+  );
+
+  const composerSeed = useMemo(
+    () =>
+      handoffSeed === null
+        ? undefined
+        : buildHandoffComposerSeed(handoffSeed, rootComposeProjectId),
+    [handoffSeed, rootComposeProjectId],
   );
 
   return (
@@ -487,14 +531,18 @@ export function RootComposeView() {
       onProjectChange={setRootComposeProjectId}
       draftStorage={{ kind: "new-thread" }}
       selectionScope="new-thread"
-      preferReadyProviderWhenUnset
+      seed={composerSeed}
+      resetKey={handoffSeed?.sourceThreadId ?? null}
+      preferReadyProviderWhenUnset={handoffSeed === null}
       onSubmit={handleSubmit}
     >
       {(composer) => (
         <RootComposeSurface
           composer={composer}
+          handoffSeed={handoffSeed}
           lastCreatedThreadId={lastCreatedThreadId}
           rootComposeProjectId={rootComposeProjectId}
+          setHandoffSeed={setHandoffSeed}
           setRootComposeProjectId={setRootComposeProjectId}
           setStartedComposing={setStartedComposing}
           startedComposing={startedComposing}
@@ -506,8 +554,10 @@ export function RootComposeView() {
 
 interface RootComposeSurfaceProps {
   composer: NewThreadComposerState;
+  handoffSeed: ThreadHandoffComposeSeed | null;
   lastCreatedThreadId: string | null;
   rootComposeProjectId: string;
+  setHandoffSeed: (seed: ThreadHandoffComposeSeed | null) => void;
   setRootComposeProjectId: (projectId: string) => void;
   setStartedComposing: (started: boolean) => void;
   startedComposing: boolean;
@@ -515,8 +565,10 @@ interface RootComposeSurfaceProps {
 
 function RootComposeSurface({
   composer,
+  handoffSeed,
   lastCreatedThreadId,
   rootComposeProjectId,
+  setHandoffSeed,
   setRootComposeProjectId,
   setStartedComposing,
   startedComposing,
@@ -551,6 +603,9 @@ function RootComposeSurface({
     hostSelectionReady,
     selectHostForNewEnvironment,
     setEnvironmentSelectionValue,
+    setProviderModelReasoning,
+    setPermissionMode,
+    setServiceTier,
     renderPromptBox,
   } = composer;
   const rootPanelEnvironmentId =
@@ -596,6 +651,7 @@ function RootComposeSurface({
   const searchInitialDraft = useInitialPromptDraft(searchInitialPrompt);
   const stateInitialDraft = useInitialPromptDraft(stateInitialPrompt);
   const setPromptDraft = composerActions.restoreDraft;
+  const getCurrentPromptDraft = promptDraft.getCurrent;
   const restorePromptDraftIfEmpty = promptDraft.restoreIfEmpty;
 
   useEffect(() => {
@@ -623,6 +679,9 @@ function RootComposeSurface({
     const environmentTarget = readRootComposeEnvironmentTargetFromLocationState(
       location.state,
     );
+    const nextHandoffSeed = readThreadHandoffComposeSeedFromLocationState(
+      location.state,
+    );
     if (!hasSingleUseRootComposeTargetState(location.state)) return;
     if (environmentTarget?.kind === "host" && !hostSelectionReady) {
       return;
@@ -647,6 +706,24 @@ function RootComposeSurface({
     } else if (environmentTarget?.kind === "host") {
       selectHostForNewEnvironment(environmentTarget.hostId);
     }
+    if (nextHandoffSeed !== null) {
+      setHandoffSeed(nextHandoffSeed);
+      setRootComposeProjectId(nextHandoffSeed.projectId);
+      setProviderModelReasoning(nextHandoffSeed);
+      setPermissionMode(nextHandoffSeed.permissionMode);
+      setServiceTier(nextHandoffSeed.serviceTier);
+      if (nextHandoffSeed.environmentId !== null) {
+        seedEnvironmentSelectionValue(
+          encodeReuseValue(nextHandoffSeed.environmentId),
+        );
+      }
+      setPromptDraft(
+        mergeThreadHandoffComposeDraft(
+          nextHandoffSeed.draft,
+          getCurrentPromptDraft(),
+        ),
+      );
+    }
     if (shouldStartComposingFromLocationState(location.state)) {
       window.requestAnimationFrame(focusPromptBox);
     }
@@ -662,6 +739,13 @@ function RootComposeSurface({
     navigate,
     seedEnvironmentSelectionValue,
     selectHostForNewEnvironment,
+    getCurrentPromptDraft,
+    setHandoffSeed,
+    setPermissionMode,
+    setPromptDraft,
+    setProviderModelReasoning,
+    setRootComposeProjectId,
+    setServiceTier,
     setPlacement,
     setStartedComposing,
     stateInitialPrompt,
@@ -1654,7 +1738,10 @@ function RootComposeSurface({
     </div>
   ) : null;
   const showEmptyWelcome =
-    !startedComposing && projects !== undefined && projects.length === 0;
+    handoffSeed === null &&
+    !startedComposing &&
+    projects !== undefined &&
+    projects.length === 0;
   const handleStartComposing = useCallback(
     (prefill?: string) => {
       if (prefill) {
@@ -1708,6 +1795,42 @@ function RootComposeSurface({
     },
     [parsedEnvironment, setEnvironmentSelectionValue],
   );
+  const handleCancelHandoffDraft = useCallback(() => {
+    setHandoffSeed(null);
+    window.requestAnimationFrame(focusPromptBox);
+  }, [focusPromptBox, setHandoffSeed]);
+
+  const promptHeader = useMemo(() => {
+    if (handoffSeed === null) {
+      return null;
+    }
+    return (
+      <div className="flex">
+        <div
+          aria-label={`Handing off ${handoffSeed.sourceThreadTitle}`}
+          className="-ml-1.5 inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-muted py-0 pl-2.5 pr-1 text-xs font-medium text-muted-foreground"
+        >
+          <Icon
+            name="MessageSquarePlus"
+            className="size-3.5 shrink-0"
+            aria-hidden
+          />
+          <span className="min-w-0 truncate">
+            Handing off {handoffSeed.sourceThreadTitle}
+          </span>
+          <button
+            type="button"
+            aria-label="Cancel handoff"
+            className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={handleCancelHandoffDraft}
+          >
+            <Icon name="X" className="size-3" aria-hidden />
+          </button>
+        </div>
+      </div>
+    );
+  }, [handleCancelHandoffDraft, handoffSeed]);
+
   const promptBanner = useMemo(() => {
     if (blockingProviderCliStatus === null) {
       return null;
@@ -1768,6 +1891,7 @@ function RootComposeSurface({
     id: "root-compose-prompt",
     autoFocus: !isProviderCliBlocked,
     mentionMenuPlacement: isCompactHomeLayout ? "top" : "bottom",
+    header: promptHeader,
     banner: promptBanner,
     blockedReason:
       blockingProviderCliStatus === null
