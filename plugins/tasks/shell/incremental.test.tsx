@@ -106,6 +106,27 @@ afterEach(() => {
 });
 
 describe("incremental task list updates", () => {
+  it("keeps all-project Focus rows bounded", async () => {
+    const store = seed(
+      ...Array.from({ length: 200 }, (_, index) =>
+        task(
+          `TSK-${index + 1}`,
+          index % 2 === 0 ? "todo" : "in_progress",
+          index + 1,
+        ),
+      ),
+    );
+    const slot = renderSlot(
+      app.navPanels[0]!,
+      { subPath: "all" },
+      { rpc: trackedRpc(store, counters()) },
+    );
+    await slot.findByText("TSK-1 title");
+    expect(
+      slot.container.querySelectorAll("[data-task-key]").length,
+    ).toBeLessThan(120);
+  });
+
   it("patches one row per burst instead of refetching the list", async () => {
     const first = task("TSK-1", "todo", 1);
     const second = task("TSK-2", "in_progress", 2);
@@ -180,7 +201,7 @@ describe("incremental task list updates", () => {
 describe("incremental board updates", () => {
   it("re-reads only the changed card", async () => {
     const first = task("TSK-1", "todo", 1);
-    const second = task("TSK-2", "done", 2);
+    const second = task("TSK-2", "in_progress", 2);
     const store = seed(first, second);
     const calls = counters();
     const slot = renderSlot(

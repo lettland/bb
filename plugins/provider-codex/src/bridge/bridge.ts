@@ -60,7 +60,13 @@ import {
   extractCodexMacOsPermissionRequest,
   type CodexMacOsPermissionRequest,
 } from "../interactive-requests.js";
-import { toCodexExecutionDelta } from "../execution-report.js";
+import {
+  sameThreadExecution,
+  toCodexExecutionDelta,
+  type CodexTurnExecutionSettings,
+  toCodexTurnExecution,
+  type ThreadExecution,
+} from "../execution-report.js";
 import { parseModelsResponse } from "../models.js";
 import { macOsPermissionPresentation } from "../presentation.js";
 import {
@@ -477,6 +483,7 @@ interface CodexBridgeSession {
   quotaRecoveryAttempted: boolean;
   quotaRecoveryAllowed: boolean;
   rebuildBeforeNextTurnReason: string | null;
+  lastReportedExecution: ThreadExecution | null;
   closing: boolean;
   previousChildExit: Promise<void> | null;
   releasePromise: Promise<void> | null;
@@ -1118,6 +1125,7 @@ async function constructThreadSession(
       launchEnv[CODEX_POOL_BASE_URL_ENV] && launchEnv[CODEX_POOL_AUTH_TOKEN_ENV]
     ),
     rebuildBeforeNextTurnReason: null,
+    lastReportedExecution: null,
     closing: false,
     previousChildExit: null,
     releasePromise: null,
@@ -1251,6 +1259,7 @@ async function constructThreadSession(
     announceSessionIdentity(session, codexThreadId);
     const executionDelta = toCodexExecutionDelta(result);
     if (executionDelta !== null) {
+      session.lastReportedExecution = executionDelta.execution;
       sendThreadDeltas(session, [executionDelta]);
     }
     return { session, codexThreadId };
@@ -1300,6 +1309,7 @@ function registerResumableSession(session: CodexBridgeSession): void {
     quotaRecoveryAttempted: false,
     quotaRecoveryAllowed: session.quotaRecoveryAllowed,
     rebuildBeforeNextTurnReason: null,
+    lastReportedExecution: null,
     closing: false,
     previousChildExit: null,
     releasePromise: null,
@@ -1878,6 +1888,13 @@ async function handleTurnStart(
         }
         throw error;
       });
+      reportTurnExecution(session, {
+        model: decoded.sessionOptions.model ?? undefined,
+        serviceTier: toCodexServiceTier(decoded.sessionOptions.serviceTier),
+        approvalPolicy: permissionSettings.approvalPolicy,
+        approvalsReviewer: permissionSettings.approvalsReviewer,
+        sandboxType: permissionSettings.sandboxPolicy.type,
+      });
     }
     sendResult(id, { threadId: params.threadId });
     settleAcceptedDispatch({
@@ -1899,6 +1916,22 @@ async function handleTurnStart(
       error instanceof Error ? error.message : String(error),
     );
   }
+}
+
+function reportTurnExecution(
+  session: CodexBridgeSession,
+  turn: CodexTurnExecutionSettings,
+): void {
+  const previous = session.lastReportedExecution;
+  if (previous === null) {
+    return;
+  }
+  const execution = toCodexTurnExecution(previous, turn);
+  if (sameThreadExecution(previous, execution)) {
+    return;
+  }
+  session.lastReportedExecution = execution;
+  sendThreadDeltas(session, [{ kind: "thread.execution", execution }]);
 }
 
 async function handleTurnSteer(

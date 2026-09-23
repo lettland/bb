@@ -419,7 +419,7 @@ export function BoardView({ projectId }: BoardViewProps) {
     ) {
       return null;
     }
-    for (const status of visibleBoardStatuses(current)) {
+    for (const status of visibleBoardStatuses()) {
       const columnElement = columnRefs.current.get(status);
       if (!columnElement) continue;
       const rect = columnElement.getBoundingClientRect();
@@ -650,7 +650,7 @@ export function BoardView({ projectId }: BoardViewProps) {
         drag !== null && "cursor-grabbing",
       )}
     >
-      {visibleBoardStatuses(columns).map(renderColumn)}
+      {visibleBoardStatuses().map(renderColumn)}
       {drag && ghostTask ? (
         <div
           className="pointer-events-none fixed z-50"

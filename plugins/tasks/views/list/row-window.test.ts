@@ -28,8 +28,33 @@ describe("rowWindows", () => {
       counts: [above, 5000],
       scrollTop: 0,
     });
-    expect(first).toEqual([0, above]);
+    expect(first![0]).toBe(0);
+    expect(first![1]).toBeLessThan(above);
     expect(second).toEqual([0, 0]);
+  });
+
+  it("bounds rows spread across many small groups", () => {
+    const ranges = rowWindows({
+      ...base,
+      counts: Array(30).fill(100),
+      scrollTop: 0,
+    });
+    const rendered = ranges.reduce(
+      (total, [start, end]) => total + end - start,
+      0,
+    );
+    expect(rendered).toBeLessThan(120);
+  });
+
+  it("accounts for project headers when windowing later groups", () => {
+    const input = { ...base, counts: [100, 5000], scrollTop: 5000 };
+    const withProjects = rowWindows({
+      ...input,
+      headerHeights: [80, 80],
+    });
+    const withoutProjects = rowWindows(input);
+    expect(withProjects[1]![0]).toBeLessThan(withoutProjects[1]![0]);
+    expect(withProjects[1]![1] - withProjects[1]![0]).toBeLessThan(200);
   });
 
   it("falls back to a bounded slice before the viewport is measured", () => {

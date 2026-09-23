@@ -15,6 +15,7 @@ const ROW_WINDOW_SCROLL_STEP_PX = 200;
 export interface RowWindowInput {
   counts: readonly number[];
   headerHeight: number;
+  headerHeights?: readonly number[];
   rowHeight: number;
   scrollTop: number;
   viewportHeight: number;
@@ -25,18 +26,24 @@ export type RowRange = readonly [start: number, end: number];
 export function rowWindows({
   counts,
   headerHeight,
+  headerHeights,
   rowHeight,
   scrollTop,
   viewportHeight,
 }: RowWindowInput): RowRange[] {
   const ranges: RowRange[] = [];
+  const windowRows =
+    counts.reduce((total, count) => total + count, 0) >= ROW_WINDOW_THRESHOLD;
   let top = 0;
-  for (const count of counts) {
-    top += headerHeight;
-    if (count < ROW_WINDOW_THRESHOLD) {
+  for (const [index, count] of counts.entries()) {
+    top += headerHeights?.[index] ?? headerHeight;
+    if (!windowRows) {
       ranges.push([0, count]);
     } else if (viewportHeight <= 0 || rowHeight <= 0) {
-      ranges.push([0, Math.min(count, ROW_WINDOW_FALLBACK_ROWS)]);
+      ranges.push([
+        0,
+        index === 0 ? Math.min(count, ROW_WINDOW_FALLBACK_ROWS) : 0,
+      ]);
     } else {
       const from = scrollTop - ROW_WINDOW_OVERSCAN_PX - top;
       const to = scrollTop + viewportHeight + ROW_WINDOW_OVERSCAN_PX - top;
@@ -54,6 +61,21 @@ interface Viewport {
   height: number;
   rowHeight: number;
   headerHeight: number;
+  projectOffsetHeight: number;
+}
+
+function projectOffsetHeight(element: HTMLElement): number {
+  const project = element.querySelector<HTMLElement>("[data-project-group]");
+  const header = project?.querySelector<HTMLElement>(
+    "[data-project-group-header]",
+  );
+  if (project === null || header === undefined || header === null) return 0;
+  const style = getComputedStyle(project);
+  return (
+    header.offsetHeight +
+    Number.parseFloat(style.marginBottom) +
+    Number.parseFloat(style.borderBottomWidth)
+  );
 }
 
 export function useRowWindowViewport(
@@ -65,6 +87,7 @@ export function useRowWindowViewport(
     height: 0,
     rowHeight: 0,
     headerHeight: 0,
+    projectOffsetHeight: 0,
   });
   const frame = useRef<number | null>(null);
 
@@ -83,11 +106,13 @@ export function useRowWindowViewport(
         height: element.clientHeight,
         rowHeight: row?.offsetHeight ?? current.rowHeight,
         headerHeight: header?.offsetHeight ?? current.headerHeight,
+        projectOffsetHeight: projectOffsetHeight(element),
       };
       return next.scrollTop === current.scrollTop &&
         next.height === current.height &&
         next.rowHeight === current.rowHeight &&
-        next.headerHeight === current.headerHeight
+        next.headerHeight === current.headerHeight &&
+        next.projectOffsetHeight === current.projectOffsetHeight
         ? current
         : next;
     });
@@ -120,4 +145,30 @@ export function useRowWindowViewport(
   }, [scrollRef, read]);
 
   return viewport;
+}
+
+export function useListRowWindows(
+  scrollRef: RefObject<HTMLElement | null>,
+  counts: readonly number[],
+  projectStarts: ReadonlySet<number> | null,
+  measureKey: unknown,
+) {
+  const viewport = useRowWindowViewport(scrollRef, measureKey);
+  const ranges = rowWindows({
+    counts,
+    headerHeight: viewport.headerHeight,
+    ...(projectStarts === null
+      ? {}
+      : {
+          headerHeights: counts.map(
+            (_, index) =>
+              viewport.headerHeight +
+              (projectStarts.has(index) ? viewport.projectOffsetHeight : 0),
+          ),
+        }),
+    rowHeight: viewport.rowHeight,
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.height,
+  });
+  return { viewport, ranges };
 }

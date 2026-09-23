@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { TASK_ARCHIVE_BATCH_MAX, type Label, type Task } from "../../shared/contract.js";
+import {
+  TASK_ARCHIVE_BATCH_MAX,
+  type Label,
+  type Project,
+  type Task,
+} from "../../shared/contract.js";
 import { errorMessage } from "../../shared/errors.js";
 import { useProjects, useTasksRpc } from "../../shell/data.js";
 import { useTasksNavigation } from "../../shell/routes.js";
@@ -10,7 +15,13 @@ import { Button } from "@/components/ui/button";
 import { DelayedLoading } from "@/components/ui/delayed-loading";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useLabels, useListTasks, useTaskListMeta } from "./data.js";
+import {
+  modeStatusOptions,
+  statusFilterForMode,
+  useLabels,
+  useListTasks,
+  useTaskListMeta,
+} from "./data.js";
 import {
   EMPTY_FILTERS,
   hasActiveFilters,
@@ -39,7 +50,7 @@ import {
 import { editedTasks, matchesFilters } from "./optimistic.js";
 import { useListTaskEdits } from "./use-task-edits.js";
 import { TaskRow } from "./row.js";
-import { rowWindows, useRowWindowViewport } from "./row-window.js";
+import { useListRowWindows } from "./row-window.js";
 
 const NO_LABELS: readonly Label[] = [];
 
@@ -69,6 +80,38 @@ function LoadingRows() {
   );
 }
 
+function buildFocusLayout(
+  projects: readonly Project[],
+  tasks: readonly Task[],
+  sort: TaskSort,
+) {
+  const sections: {
+    project: Project;
+    tasks: Task[];
+    groups: ReturnType<typeof groupTasksByStatus>;
+    rangeStart: number;
+  }[] = [];
+  const windowGroups: ReturnType<typeof groupTasksByStatus> = [];
+  const projectStarts = new Set<number>();
+  for (const project of projects) {
+    const projectTasks = sortTasks(
+      tasks.filter((task) => task.projectId === project.id),
+      sort,
+    );
+    if (projectTasks.length === 0) continue;
+    const groups = groupTasksByStatus(projectTasks);
+    sections.push({
+      project,
+      tasks: projectTasks,
+      groups,
+      rangeStart: windowGroups.length,
+    });
+    projectStarts.add(windowGroups.length);
+    windowGroups.push(...groups);
+  }
+  return { sections, windowGroups, projectStarts };
+}
+
 export function ListView({ projectId, mode }: ListViewProps) {
   const navigation = useTasksNavigation();
   const rpc = useTasksRpc();
@@ -87,7 +130,14 @@ export function ListView({ projectId, mode }: ListViewProps) {
   useEffect(() => {
     setPreference(loadListPreference(preferenceScope));
   }, [preferenceScope]);
-  const filters = preference.filters;
+  const storedFilters = preference.filters;
+  const filters = useMemo(
+    (): ListFilterState => ({
+      ...storedFilters,
+      statuses: statusFilterForMode(mode, storedFilters.statuses),
+    }),
+    [storedFilters, mode],
+  );
   const sort = preference.sort;
   const setFilters = (next: ListFilterState) => {
     setPreference((current) => {
@@ -187,14 +237,46 @@ export function ListView({ projectId, mode }: ListViewProps) {
     () => groupTasksByStatus(sortTasks(displayTasks ?? [], sort)),
     [displayTasks, sort],
   );
+  const focusLayout = useMemo(
+    () =>
+      projectId === null && mode === "focus" && displayTasks !== undefined
+        ? buildFocusLayout(projects.data ?? [], displayTasks, sort)
+        : null,
+    [projectId, mode, displayTasks, sort, projects.data],
+  );
+  const windowGroups = focusLayout?.windowGroups ?? groups;
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => setSelected(new Set()), [projectId, mode]);
   const selectable =
     projectId !== null && (mode === "recent" || mode === "archive");
+  const selectableIds = useMemo(() => {
+    const statuses = modeStatusOptions(mode);
+    return new Set(
+      (displayTasks ?? [])
+        .filter((task) => statuses.includes(task.status))
+        .map((task) => task.id),
+    );
+  }, [displayTasks, mode]);
+  const visibleSelected = useMemo(
+    () => [...selected].filter((taskId) => selectableIds.has(taskId)),
+    [selected, selectableIds],
+  );
+  useEffect(() => {
+    if (displayTasks === undefined) return;
+    setSelected((current) => {
+      const kept = [...current].filter((taskId) => selectableIds.has(taskId));
+      return kept.length === current.size ? current : new Set(kept);
+    });
+  }, [displayTasks, selectableIds]);
+  const [archivePending, setArchivePending] = useState(false);
+  const archiveInFlight = useRef(false);
   const mutateSelection = async () => {
-    if (projectId === null || selected.size === 0) return;
+    if (projectId === null || visibleSelected.length === 0) return;
+    if (archiveInFlight.current) return;
+    archiveInFlight.current = true;
+    setArchivePending(true);
     try {
-      const input = { projectId, taskIds: [...selected], authorName: "You" };
+      const input = { projectId, taskIds: visibleSelected, authorName: "You" };
       if (mode === "archive") await rpc.call("restoreTasks", input);
       else await rpc.call("archiveTasks", input);
       setSelected(new Set());
@@ -203,6 +285,9 @@ export function ListView({ projectId, mode }: ListViewProps) {
       push(
         error instanceof Error ? error.message : "Task archive action failed",
       );
+    } finally {
+      archiveInFlight.current = false;
+      setArchivePending(false);
     }
   };
   const setTaskSelected = (taskId: string, checked: boolean) => {
@@ -227,7 +312,6 @@ export function ListView({ projectId, mode }: ListViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const scopeKey = listScrollScopeKey({
     projectId,
-    activeOnly,
     mode,
     filters,
     sort,
@@ -254,14 +338,12 @@ export function ListView({ projectId, mode }: ListViewProps) {
     revision: tasksQuery.data?.length ?? 0,
   });
 
-  const viewport = useRowWindowViewport(scrollRef, groups);
-  const ranges = rowWindows({
-    counts: groups.map((group) => group.tasks.length),
-    headerHeight: viewport.headerHeight,
-    rowHeight: viewport.rowHeight,
-    scrollTop: viewport.scrollTop,
-    viewportHeight: viewport.height,
-  });
+  const { viewport, ranges } = useListRowWindows(
+    scrollRef,
+    windowGroups.map((group) => group.tasks.length),
+    focusLayout?.projectStarts ?? null,
+    windowGroups,
+  );
 
   let body: React.ReactNode;
   if (
@@ -338,12 +420,13 @@ export function ListView({ projectId, mode }: ListViewProps) {
   } else {
     const renderStatusGroups = (
       taskGroups: typeof groups,
-      virtualized: boolean,
+      rangeStart: number,
     ) =>
       taskGroups.map((group, groupIndex) => {
-        const [start, end] = virtualized
-          ? (ranges[groupIndex] ?? [0, group.tasks.length])
-          : [0, group.tasks.length];
+        const [start, end] = ranges[rangeStart + groupIndex] ?? [
+          0,
+          group.tasks.length,
+        ];
         const hiddenAbove = start * viewport.rowHeight;
         const hiddenBelow = (group.tasks.length - end) * viewport.rowHeight;
         return (
@@ -379,7 +462,7 @@ export function ListView({ projectId, mode }: ListViewProps) {
                 selected={selected.has(task.id)}
                 selectionDisabled={
                   !selected.has(task.id) &&
-                  selected.size >= TASK_ARCHIVE_BATCH_MAX
+                  visibleSelected.length >= TASK_ARCHIVE_BATCH_MAX
                 }
                 onSelectedChange={(checked) =>
                   setTaskSelected(task.id, checked)
@@ -392,44 +475,45 @@ export function ListView({ projectId, mode }: ListViewProps) {
           </section>
         );
       });
-    if (projectId === null && mode === "focus") {
-      const sections = (projects.data ?? []).flatMap((project) => {
-        const projectTasks = sortTasks(
-          displayTasks.filter((task) => task.projectId === project.id),
-          sort,
-        );
-        if (projectTasks.length === 0) return [];
-        return [
-          <section key={project.id} className="mb-3 border-b border-border">
-            <button
-              type="button"
-              onClick={() =>
-                navigation.go({
-                  kind: "project",
-                  projectId: project.id,
-                  view: null,
-                })
-              }
-              className="sticky top-0 z-30 flex w-full items-center gap-2 bg-sidebar px-3.5 py-2 text-left text-sm font-semibold hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+    if (focusLayout !== null) {
+      body = focusLayout.sections.map(
+        ({ project, tasks, groups: projectGroups, rangeStart }) => {
+          return (
+            <section
+              key={project.id}
+              data-project-group
+              className="mb-3 border-b border-border"
             >
-              <span
-                aria-hidden
-                className="size-3 rounded-sm"
-                style={{ backgroundColor: project.color }}
-              />
-              <span className="flex-1">{project.name}</span>
-              <span className="text-xs font-normal tabular-nums text-muted-foreground">
-                {projectTasks.length} active
-              </span>
-              <Icon name="ChevronRight" className="size-3.5" />
-            </button>
-            {renderStatusGroups(groupTasksByStatus(projectTasks), false)}
-          </section>,
-        ];
-      });
-      body = sections;
+              <button
+                type="button"
+                data-project-group-header
+                onClick={() =>
+                  navigation.go({
+                    kind: "project",
+                    projectId: project.id,
+                    view: null,
+                  })
+                }
+                className="sticky top-0 z-30 flex w-full items-center gap-2 bg-sidebar px-3.5 py-2 text-left text-sm font-semibold hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                <span
+                  aria-hidden
+                  className="size-3 rounded-sm"
+                  style={{ backgroundColor: project.color }}
+                />
+                <span className="flex-1">{project.name}</span>
+                <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                  {tasks.length} active
+                </span>
+                <Icon name="ChevronRight" className="size-3.5" />
+              </button>
+              {renderStatusGroups(projectGroups, rangeStart)}
+            </section>
+          );
+        },
+      );
     } else {
-      body = renderStatusGroups(groups, true);
+      body = renderStatusGroups(groups, 0);
     }
   }
 
@@ -441,17 +525,19 @@ export function ListView({ projectId, mode }: ListViewProps) {
         sort={sort}
         onSortChange={setSort}
         labelOptions={labelOptions}
+        statusOptions={modeStatusOptions(mode)}
         taskCount={displayTasks?.length}
       />
       {selectable ? (
         <div className="flex items-center justify-between border-b border-border-hairline px-3.5 py-2 text-xs">
           <span className="text-muted-foreground" aria-live="polite">
-            {selected.size} selected
+            {visibleSelected.length} selected
           </span>
           <Button
             size="sm"
             variant="outline"
-            disabled={selected.size === 0}
+            disabled={visibleSelected.length === 0 || archivePending}
+            aria-busy={archivePending}
             onClick={() => void mutateSelection()}
           >
             <Icon
