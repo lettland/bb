@@ -520,10 +520,12 @@ describe("events", () => {
     expect(result).toEqual({
       acceptedEvents: [
         {
+          createdAt: expect.any(Number),
           threadId: thread.id,
           sequence: 6,
         },
         {
+          createdAt: expect.any(Number),
           threadId: thread.id,
           sequence: 7,
         },
@@ -681,9 +683,9 @@ describe("events", () => {
 
     expect(result).toEqual({
       acceptedEvents: [
-        { threadId: thread.id, sequence: 4 },
-        { threadId: thread.id, sequence: 5 },
-        { threadId: thread.id, sequence: 6 },
+        { createdAt: expect.any(Number), threadId: thread.id, sequence: 4 },
+        { createdAt: expect.any(Number), threadId: thread.id, sequence: 5 },
+        { createdAt: expect.any(Number), threadId: thread.id, sequence: 6 },
       ],
       insertedInputIndexes: [1, 2, 3],
       skippedTurnUnstartedInputIndexes: [],
@@ -810,8 +812,8 @@ describe("events", () => {
 
     expect(result).toEqual({
       acceptedEvents: [
-        { threadId: thread.id, sequence: 4 },
-        { threadId: thread.id, sequence: 5 },
+        { createdAt: expect.any(Number), threadId: thread.id, sequence: 4 },
+        { createdAt: expect.any(Number), threadId: thread.id, sequence: 5 },
       ],
       insertedInputIndexes: [1, 2],
       skippedTurnUnstartedInputIndexes: [],
@@ -855,7 +857,9 @@ describe("events", () => {
 
     expect(first.insertedInputIndexes).toEqual([0, 1]);
     expect(replay).toEqual({
-      acceptedEvents: [{ threadId: thread.id, sequence: 3 }],
+      acceptedEvents: [
+        { createdAt: expect.any(Number), threadId: thread.id, sequence: 3 },
+      ],
       insertedInputIndexes: [1],
       skippedTurnUnstartedInputIndexes: [],
     });

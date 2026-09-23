@@ -237,6 +237,12 @@ const MIGRATIONS = [
     CREATE INDEX idx_task_key_aliases_task ON task_key_aliases(task_id);
   `,
   `
+    ALTER TABLE tasks ADD COLUMN archived_at TEXT;
+    ALTER TABLE tasks ADD COLUMN closed_at TEXT;
+    CREATE INDEX idx_tasks_archive
+      ON tasks(archived_at, closed_at, project_id, status);
+  `,
+  `
     ALTER TABLE presets ADD COLUMN service_tier_open TEXT;
     UPDATE presets SET service_tier_open = service_tier;
     ALTER TABLE presets DROP COLUMN service_tier;

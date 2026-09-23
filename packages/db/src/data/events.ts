@@ -156,6 +156,7 @@ export interface AppendDaemonEventInput {
 }
 
 export interface AcceptedDaemonEvent {
+  createdAt: number;
   sequence: number;
   threadId: string;
 }
@@ -835,6 +836,7 @@ export function appendDaemonEventsInTransaction(
     }
 
     const acceptedEvent: AcceptedDaemonEvent = {
+      createdAt: now,
       sequence,
       threadId: input.threadId,
     };
