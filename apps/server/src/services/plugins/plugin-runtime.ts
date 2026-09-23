@@ -1116,11 +1116,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     return null;
   }
 
-  function isBuiltinPluginId(id: string): boolean {
-    const row = getInstalledPlugin(deps.db, id);
-    return row !== undefined && row.provenance === "builtin";
-  }
-
   function isPrebuiltServerSdkCompatible(
     meta: { sdkMajor: number; sdkVersion: string } | null,
   ): boolean {

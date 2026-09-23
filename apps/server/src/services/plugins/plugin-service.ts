@@ -230,7 +230,7 @@ export interface PluginStartOptions {
 }
 
 export interface PluginService {
-  isBuiltin(id: string): boolean;
+  isBundledBuiltin(id: string): boolean;
   events: PluginThreadEventEmitter;
   /** The hook chain the dispatch pipeline consults; registered in createApp. */
   hooks: PluginHookProvider;
@@ -1293,7 +1293,14 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
   }
 
   return {
-    isBuiltin: isBuiltinPluginId,
+    isBundledBuiltin(id) {
+      const row = getInstalledPlugin(deps.db, id);
+      return (
+        row !== undefined &&
+        row.provenance === "builtin" &&
+        !isOrphanedBuiltinRow(row)
+      );
+    },
     quiesceBackgroundWork,
     resumeBackgroundWork,
 
