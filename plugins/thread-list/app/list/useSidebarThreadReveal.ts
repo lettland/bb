@@ -8,17 +8,20 @@ import {
   resolveSidebarProjectId,
 } from "../model/project-thread-groups.js";
 import { sectionKeyForThreadSection } from "../model/section-keys.js";
+import { findProjectGroup } from "../model/project-groups.js";
 import type { CollapsibleSidebarSectionId } from "../model/sidebar-section-id.js";
 import { useBbContext } from "@get-bb/plugin-sdk/app";
 import type { OrganizationMode as SidebarOrganizationMode } from "../../shared/preferences.js";
 import { useSidebarData } from "../model/use-sidebar-data.js";
 import {
   collapsedEnvironmentIdsAtom,
+  collapsedProjectGroupIdsAtom,
   collapsedProjectIdsAtom,
   collapsedSidebarSectionIdsAtom,
   sidebarCollapsedMachinesAtom,
   sidebarCollapsedThreadSectionsAtom,
   sidebarOrganizationModeAtom,
+  sidebarProjectGroupsAtom,
 } from "../preferences/atoms.js";
 import { usePreferencesReady } from "../preferences/PreferencesSync.js";
 import { useExpandThreadAncestors } from "./useReadStatusGrouping.js";
@@ -124,6 +127,10 @@ export function useSidebarThreadRevealCore({
   const expandThreadAncestors = useExpandThreadAncestors();
   const setCollapsedEnvironmentIdList = useSetAtom(collapsedEnvironmentIdsAtom);
   const setCollapsedProjectIdList = useSetAtom(collapsedProjectIdsAtom);
+  const projectGroups = useAtomValue(sidebarProjectGroupsAtom);
+  const setCollapsedProjectGroupIdList = useSetAtom(
+    collapsedProjectGroupIdsAtom,
+  );
   const setCollapsedMachineKeyList = useSetAtom(sidebarCollapsedMachinesAtom);
   const setCollapsedSectionList = useSetAtom(
     sidebarCollapsedThreadSectionsAtom,
@@ -229,6 +236,12 @@ export function useSidebarThreadRevealCore({
         setCollapsedProjectIdList((current) =>
           removeCollapsedIds(current, new Set([projectId])),
         );
+        const group = findProjectGroup(projectGroups, projectId);
+        if (group) {
+          setCollapsedProjectGroupIdList((current) =>
+            removeCollapsedIds(current, new Set([group.id])),
+          );
+        }
       }
       if (expansion.sidebarSectionId) {
         const sidebarSectionId = expansion.sidebarSectionId;
@@ -249,6 +262,8 @@ export function useSidebarThreadRevealCore({
     expandThreadAncestors,
     setCollapsedEnvironmentIdList,
     setCollapsedProjectIdList,
+    projectGroups,
+    setCollapsedProjectGroupIdList,
     setCollapsedMachineKeyList,
     setCollapsedSectionList,
     setCollapsedSidebarSectionIdList,

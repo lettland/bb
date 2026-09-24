@@ -1444,8 +1444,11 @@ describe("Labels section", () => {
               },
             ],
           }),
-          listTasks: (input: Record<string, unknown>) => {
-            listTasksCalls.push(input);
+          listTasks: (input: unknown) => {
+            if (typeof input !== "object" || input === null) {
+              throw new Error("expected listTasks input");
+            }
+            listTasksCalls.push({ ...input });
             const tasks = [
               makeTask({ id: TASK_ID, projectId: PROJECT_ID, labelIds: [LABEL_ID] }),
               makeTask({
@@ -1458,7 +1461,7 @@ describe("Labels section", () => {
             ];
             return {
               tasks:
-                input.archive === "all"
+                "archive" in input && input.archive === "all"
                   ? tasks
                   : tasks.filter((task) => task.archivedAt === null),
               nextCursor: null,

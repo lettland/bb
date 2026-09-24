@@ -642,7 +642,6 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     hostArtifacts,
     identities,
     invokeWrapped,
-    isBuiltinPluginId,
     isSafeModeExemptRow,
     isSuppressedBySafeMode,
     listPluginHooks,

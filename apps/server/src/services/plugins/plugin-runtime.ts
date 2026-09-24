@@ -2113,7 +2113,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     handleUncaughtException,
     hungServices,
     invokeWrapped,
-    isBuiltinPluginId,
     isSafeModeExemptRow,
     isSuppressedBySafeMode,
     listPluginHooks,
