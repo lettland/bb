@@ -122,7 +122,8 @@ export function checkoutBlocker(state: CheckoutState): CheckoutBlocker | null {
     return {
       label: "Unknown",
       reason: "Checkout state is unavailable",
-      guidance: "Branch changes are unavailable because this checkout could not be inspected.",
+      guidance:
+        "Branch changes are unavailable because this checkout could not be inspected.",
     };
   }
   if (state.operation.kind !== "none") {
@@ -130,7 +131,8 @@ export function checkoutBlocker(state: CheckoutState): CheckoutBlocker | null {
       return {
         label: "Conflicts",
         reason: "Checkout blocked by unresolved conflicts",
-        guidance: "Resolve the conflicts and finish or abort the Git operation to change branches.",
+        guidance:
+          "Resolve the conflicts and finish or abort the Git operation to change branches.",
       };
     }
     const name = operationName(state);
@@ -140,25 +142,20 @@ export function checkoutBlocker(state: CheckoutState): CheckoutBlocker | null {
       guidance: `Finish or abort the ${name.toLowerCase()} to change branches.`,
     };
   }
-  if (state.dirty) {
-    return {
-      label: "Dirty",
-      reason: "Checkout blocked by uncommitted changes",
-      guidance: "Commit or stash the uncommitted changes in this checkout to create or switch branches.",
-    };
-  }
   if (state.detached) {
     return {
       label: "Detached",
       reason: "Checkout blocked while HEAD is detached",
-      guidance: "Attach HEAD to a branch in this checkout to create or switch branches here.",
+      guidance:
+        "Attach HEAD to a branch in this checkout to create or switch branches here.",
     };
   }
   if (state.unborn) {
     return {
       label: "Empty repo",
       reason: "Checkout blocked before the first commit",
-      guidance: "Create the first commit in this checkout to create or switch branches.",
+      guidance:
+        "Create the first commit in this checkout to create or switch branches.",
     };
   }
   return null;
@@ -538,7 +535,10 @@ function CheckoutInputsControl({
               <BranchPickerText label="Checkout" className="flex-1" wrap />
             </BranchPickerRow>
             {blocker !== null ? (
-              <p role="status" className="px-2 py-2 text-xs leading-snug text-muted-foreground">
+              <p
+                role="status"
+                className="px-2 py-2 text-xs leading-snug text-muted-foreground"
+              >
                 {blocker.guidance}
               </p>
             ) : null}

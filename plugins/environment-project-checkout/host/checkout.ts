@@ -105,12 +105,6 @@ async function assertSwitchable(
       `Cannot checkout branch while ${operation.kind} is in progress`,
     );
   }
-  if (await hasUncommittedChanges(cwd)) {
-    throw new WorkspaceError(
-      "checkout_dirty",
-      "Cannot checkout branch while the workspace has uncommitted changes",
-    );
-  }
   return "ready";
 }
 

@@ -147,25 +147,91 @@ describe("checkout host entry", () => {
     await restarted.experimental_dispose();
   });
 
-  it("refuses to switch branches over uncommitted changes", async () => {
-    const { repo, dataDir } = await createRepository();
-    await git(repo, "branch", "release");
-    await writeFile(join(repo, "README.md"), "edited\n");
-    const harness = createHarness(dataDir);
-    const result = await harness.experimental_call("attach", {
-      operationId: "dirty",
-      path: repo,
-      branch: { kind: "existing", name: "release" },
-    });
-    expect(result).toMatchObject({
-      status: "failed",
-      message: expect.stringContaining("uncommitted changes"),
-    });
-    expect((await git(repo, "rev-parse", "--abbrev-ref", "HEAD")).trim()).toBe(
-      "main",
-    );
-    await harness.experimental_dispose();
-  });
+  describe.each(["tracked", "staged", "untracked"] as const)(
+    "with %s changes",
+    (change) => {
+      const file = change === "untracked" ? "new.txt" : "README.md";
+      const status =
+        change === "untracked"
+          ? "?? new.txt"
+          : change === "staged"
+            ? "M  README.md"
+            : " M README.md";
+
+      it.each(["existing", "new"] as const)(
+        "carries edits onto a %s branch",
+        async (kind) => {
+          const { repo, dataDir } = await createRepository();
+          await git(repo, "branch", "release");
+          await writeFile(join(repo, file), "edited\n");
+          if (change === "staged") await git(repo, "add", file);
+          const harness = createHarness(dataDir);
+          const branch =
+            kind === "existing"
+              ? { kind, name: "release" }
+              : { kind, name: "feature", baseBranch: "main" };
+          const result = await harness.experimental_call("attach", {
+            operationId: `dirty-${kind}-${change}`,
+            path: repo,
+            branch,
+          });
+          expect(result).toMatchObject({
+            status: "attached",
+            branchName: branch.name,
+          });
+          expect(
+            (await git(repo, "rev-parse", "--abbrev-ref", "HEAD")).trim(),
+          ).toBe(branch.name);
+          expect(await readFile(join(repo, file), "utf8")).toBe("edited\n");
+          expect((await git(repo, "status", "--porcelain")).trimEnd()).toBe(
+            status,
+          );
+          expect(await git(repo, "show", ":README.md")).toBe(
+            change === "staged" ? "edited\n" : "hello\n",
+          );
+          await harness.experimental_dispose();
+        },
+      );
+
+      it.each(["existing", "new"] as const)(
+        "preserves edits when Git rejects a conflicting %s branch switch",
+        async (kind) => {
+          const { repo, dataDir } = await createRepository();
+          await git(repo, "switch", "-c", "release");
+          await writeFile(join(repo, file), "release\n");
+          await git(repo, "add", file);
+          await git(repo, "commit", "-m", "release change");
+          await git(repo, "switch", "main");
+          await writeFile(join(repo, file), "edited\n");
+          if (change === "staged") await git(repo, "add", file);
+          const harness = createHarness(dataDir);
+          const result = await harness.experimental_call("attach", {
+            operationId: `conflict-${kind}-${change}`,
+            path: repo,
+            branch:
+              kind === "existing"
+                ? { kind, name: "release" }
+                : { kind, name: "feature", baseBranch: "release" },
+          });
+          expect(result).toMatchObject({ status: "failed" });
+          expect((await git(repo, "branch", "--show-current")).trim()).toBe(
+            "main",
+          );
+          expect(await readFile(join(repo, file), "utf8")).toBe("edited\n");
+          expect((await git(repo, "status", "--porcelain")).trimEnd()).toBe(
+            status,
+          );
+          expect(await git(repo, "show", ":README.md")).toBe(
+            change === "staged" ? "edited\n" : "hello\n",
+          );
+          expect((await git(repo, "branch", "--list", "feature")).trim()).toBe(
+            "",
+          );
+          await harness.experimental_dispose();
+        },
+      );
+    },
+  );
 
   it("inspects dirty and detached checkouts", async () => {
     const { repo, dataDir } = await createRepository();
