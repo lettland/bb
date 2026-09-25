@@ -114,7 +114,7 @@ async function switchBranch(
   const { path: cwd, branch, onProgress, signal } = args;
   const switchArgs =
     branch.kind === "new"
-      ? ["switch", "-C", branch.name, branch.baseBranch]
+      ? ["switch", "-c", branch.name, branch.baseBranch]
       : ["switch", branch.name];
   const waitingStartedAt = Date.now();
   emitStep({

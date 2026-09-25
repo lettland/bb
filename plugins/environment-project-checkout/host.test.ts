@@ -233,6 +233,29 @@ describe("checkout host entry", () => {
     },
   );
 
+  it("does not reset an existing branch when a new name collides", async () => {
+    const { repo, dataDir } = await createRepository();
+    await git(repo, "switch", "-c", "feature");
+    await writeFile(join(repo, "README.md"), "feature commit\n");
+    await git(repo, "commit", "-am", "feature commit");
+    const featureHead = (await git(repo, "rev-parse", "HEAD")).trim();
+    await git(repo, "switch", "main");
+    await writeFile(join(repo, "local.txt"), "uncommitted\n");
+    const harness = createHarness(dataDir);
+    const result = await harness.experimental_call("attach", {
+      operationId: "colliding-new-branch",
+      path: repo,
+      branch: { kind: "new", name: "feature", baseBranch: "main" },
+    });
+    expect(result).toMatchObject({ status: "failed" });
+    expect((await git(repo, "branch", "--show-current")).trim()).toBe("main");
+    expect((await git(repo, "rev-parse", "feature")).trim()).toBe(featureHead);
+    expect(await readFile(join(repo, "local.txt"), "utf8")).toBe(
+      "uncommitted\n",
+    );
+    await harness.experimental_dispose();
+  });
+
   it("inspects dirty and detached checkouts", async () => {
     const { repo, dataDir } = await createRepository();
     await writeFile(join(repo, "README.md"), "edited\n");
