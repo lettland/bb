@@ -16,6 +16,15 @@ on Settings → Providers. Restore it with `bb provider enable acp-opencode`.
 This leaves other ACP agents and the host CLI intact. Disabled agents skip
 background capability probing. `bb provider list --all` includes disabled agents.
 
+Custom agents are configured through
+`bb plugin config provider-acp set customAgents '<JSON array>'`. Each entry can
+set `icon` to a host glyph such as
+`Sparkles` or a bundled mark such as `provider-acp/claude` or
+`provider-acp/glm`. Other bundled marks are `cursor`, `opencode`, `omp`, `grok`,
+and `hermes-agent` under the `provider-acp/` prefix. A replacement keeps its
+shipped icon when `icon` is omitted; another custom agent uses Toolbox. Check
+`bb provider list --json` for the icon and logo URL. The setting updates live.
+
 Cursor project skills come from `.cursor/skills`, which can link to
 `.agents/skills`. BB lists these linked skills as read-only under `cursor-project`.
 

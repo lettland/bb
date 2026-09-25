@@ -19,6 +19,7 @@ import {
   resetPreferencesSyncForTest,
   setPreferencesMirrorStorageForTest,
 } from "./app/preferences/preferences-sync.js";
+import { memoryStorage } from "./app/preferences/test-storage.js";
 import {
   defaultPreferences,
   type PreferenceValues,
@@ -330,17 +331,17 @@ describe("thread-list plugin", () => {
   });
 
   it("keys its slot and preferences mirror by its own plugin id", async () => {
-    window.localStorage.clear();
+    const storage = memoryStorage();
+    setPreferencesMirrorStorageForTest(storage);
     expect(registration.id).toBe("thread-list");
     renderList({ organizationMode: "machine" }, { pluginId: "thread-list" });
 
     await screen.findByText("Pinned thread");
     expect(
       JSON.parse(
-        window.localStorage.getItem("bb.thread-list.preferences.v1") ?? "{}",
+        storage.getItem("bb.thread-list.preferences.v1") ?? "{}",
       ).organizationMode,
     ).toBe("machine");
-    window.localStorage.clear();
   });
 
   it.each([true, false])(

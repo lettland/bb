@@ -70,7 +70,7 @@ export async function withCookieDatabaseSnapshot<T>(
   try {
     const source = openReadOnlyDatabase(cookiePath);
     try {
-      source.exec(`VACUUM INTO '${snapshotPath.replaceAll("'", "''")}'`);
+      source.prepare("VACUUM INTO ?").run(snapshotPath);
     } finally {
       source.close();
     }

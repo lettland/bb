@@ -172,7 +172,10 @@ function ThreadDraftViewer({ threadId }: { threadId: string }) {
 }
 
 function NewThreadDraftViewer() {
-  const draft = usePromptDraftStorage({ kind: "new-thread" });
+  const draft = usePromptDraftStorage({
+    kind: "new-thread",
+    projectId: PERSONAL_PROJECT_ID,
+  });
   return (
     <div>
       <div data-testid="draft-key">{draft.storageKey}</div>
@@ -227,7 +230,10 @@ function ThreadDraftSeeder({ threadId }: { threadId: string }) {
 }
 
 function NewThreadDraftSeeder() {
-  const draft = usePromptDraftStorage({ kind: "new-thread" });
+  const draft = usePromptDraftStorage({
+    kind: "new-thread",
+    projectId: PERSONAL_PROJECT_ID,
+  });
   return (
     <button
       type="button"

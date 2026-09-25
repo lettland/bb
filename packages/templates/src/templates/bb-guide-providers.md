@@ -199,6 +199,12 @@ Custom ACP agents live in the ACP providers plugin's customAgents setting, a
 JSON array. Set it with bb plugin config provider-acp set customAgents '[...]'.
 Each entry needs id (lowercase letters, digits and dashes), displayName, and
 command. bb derives provider id acp-<id> from the slug id. The id is permanent.
+Optional icon selects a host glyph such as Sparkles or a bundled ACP mark such
+as provider-acp/claude or provider-acp/glm. Other bundled marks are cursor,
+opencode, omp, grok and hermes-agent under the provider-acp/ prefix. Without
+icon, a replacement keeps the shipped agent's mark; another custom agent uses
+the Toolbox glyph. The resulting icon or logo URL appears in
+bb provider list --json and the provider picker.
 The id cursor is reserved because bb always lists that agent. The ids opencode,
 omp, grok and hermes-agent are not reserved, so an entry with one of those ids
 replaces the shipped agent. Use args, env, and cwd for the launch, modelCli
@@ -214,6 +220,11 @@ if the agent accepts an explicit compaction request; it defaults to false, and
 bb hides the /compact command for agents that do not declare it. The plugin
 re-registers its providers as soon as the setting changes, so no restart or
 config refresh is needed.
+
+The old customAcpAgents array in the app data-dir config.json is deprecated. bb
+still reads it and logs a warning for each agent it finds, until 0.41. Move each
+entry into the customAgents setting. bb drops the old logo field when it reads
+the array. Set icon in the plugin setting to use a bundled mark or host glyph.
 
 Use top-level sharedSkillRoots for one provider-neutral skill collection. The
 user and project paths use the same relative-path rules. bb indexes these roots

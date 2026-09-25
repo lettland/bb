@@ -35,6 +35,17 @@ export interface AcpAgentDefinition {
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 const ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+const HOST_GLYPH_PATTERN = /^[A-Z][A-Za-z0-9]*$/u;
+export const CUSTOM_AGENT_DECLARED_ICON_NAMES = [
+  "claude",
+  "cursor",
+  "glm",
+  "grok",
+  "hermes-agent",
+  "omp",
+  "opencode",
+] as const;
+const DECLARED_ICON_NAMES = new Set<string>(CUSTOM_AGENT_DECLARED_ICON_NAMES);
 
 const launchSpecFields = experimental_acpLaunchSpecSchema.shape;
 
@@ -43,6 +54,16 @@ export const customAcpAgentSchema = z
     id: z.string().regex(SLUG_PATTERN),
     displayName: z.string().min(1),
     command: z.string().min(1),
+    icon: z
+      .string()
+      .refine(
+        (icon) =>
+          HOST_GLYPH_PATTERN.test(icon) ||
+          (icon.startsWith("provider-acp/") &&
+            DECLARED_ICON_NAMES.has(icon.slice("provider-acp/".length))),
+        "Icon must be a host glyph or a declared ACP provider icon.",
+      )
+      .optional(),
     args: z.array(z.string()).default([]),
     env: z.record(z.string().regex(ENV_NAME_PATTERN), z.string()).default({}),
     cwd: z.string().min(1).optional(),
@@ -66,10 +87,14 @@ export function customAcpAgentDefinition(
 ): AcpAgentDefinition {
   const nativeSkillRoots =
     agent.nativeSkillRoots ?? shipped?.launch.nativeSkillRoots;
+  const icon = agent.icon ?? shipped?.icon ?? CUSTOM_AGENT_GLYPH;
   return {
     id: formatCustomAcpProviderId(agent.id),
     displayName: agent.displayName,
-    icon: CUSTOM_AGENT_GLYPH,
+    icon,
+    ...(icon === shipped?.icon && shipped.iconTint !== undefined
+      ? { iconTint: { ...shipped.iconTint } }
+      : {}),
     launch: {
       displayName: agent.displayName,
       command: agent.command,

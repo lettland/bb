@@ -1,7 +1,4 @@
-import {
-  acquireProjectAttachmentOwnership,
-  copyProjectAttachmentOwnership,
-} from "./project-attachments.js";
+import { copyProjectAttachmentOwnership } from "./project-attachments.js";
 import { assertBranchPromotionEnvironmentAvailable, assertThreadPromotionMutable } from "./branch-promotions.fork.js";
 import {
   and,
@@ -280,7 +277,6 @@ export interface CreateThreadInput {
   pluginMetadata?: { pluginId: string; metadata: JsonObject } | null;
   startupContext?: string;
   visibility?: ThreadVisibility;
-  draft?: PromptInput[] | null;
   worktreePromotion?: ThreadWorktreePromotion;
   promotionTarget?: ThreadPromotionTarget;
 }
@@ -350,7 +346,6 @@ export function createThread(
           originKind,
           originPluginId: input.originPluginId ?? null,
           visibility,
-          draft: serializeThreadDraft(input.draft ?? null),
           ...(input.worktreePromotion !== undefined
             ? { worktreePromotion: input.worktreePromotion }
             : {}),

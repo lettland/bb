@@ -81,6 +81,8 @@ import { wsManager } from "@/lib/ws";
 import { pluginSdkSettingsQueryKey } from "@/hooks/queries/query-keys";
 import { useAppNavigationHost } from "@/lib/app-navigation-host";
 import { normalizeExperimentalFileOpenOptions } from "@/lib/live-file-navigation";
+import { deprecatedAlias } from "@/lib/plugin-sdk-deprecated-aliases";
+import { useRootComposeProjectId } from "@/lib/root-compose-selection";
 import {
   getPluginFixedTabOwnerId,
   useAppFixedTabTarget,
@@ -565,6 +567,21 @@ export function useComposerInputLock(storageKey: string | null): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+function useRouteDraftScope(
+  projectId: string | undefined,
+  threadId: string | undefined,
+): PromptDraftScope {
+  const [rootComposeProjectId] = useRootComposeProjectId();
+  const newThreadProjectId = projectId ?? rootComposeProjectId;
+  return useMemo(
+    () =>
+      threadId !== undefined && projectId !== undefined
+        ? { kind: "thread", projectId, threadId }
+        : { kind: "new-thread", projectId: newThreadProjectId },
+    [newThreadProjectId, projectId, threadId],
+  );
+}
+
 type ComposerDraftSource = Pick<
   PromptDraftController,
   "getCurrent" | "subscribe"
@@ -595,13 +612,7 @@ export function useComposerView(): ComposerView {
   const providedView = useOptionalPluginComposerView();
   const composerHost = usePluginComposerHost();
   const { projectId, threadId } = useRouteState();
-  const routeScope: PromptDraftScope = useMemo(
-    () =>
-      threadId !== undefined && projectId !== undefined
-        ? { kind: "thread", projectId, threadId }
-        : { kind: "new-thread" },
-    [projectId, threadId],
-  );
+  const routeScope = useRouteDraftScope(projectId, threadId);
   const routeDraft = usePromptDraftController(routeScope);
   const draftSource = useComposerDraftSource(composerHost, routeDraft);
   const draft = usePromptDraftSnapshot(
@@ -634,13 +645,7 @@ export function useComposer(): PluginComposerApi {
   const tracksDraft = useRef(false);
   const tracksSelection = useRef(false);
   const { projectId, threadId } = useRouteState();
-  const routeScope: PromptDraftScope = useMemo(
-    () =>
-      threadId !== undefined && projectId !== undefined
-        ? { kind: "thread", projectId, threadId }
-        : { kind: "new-thread" },
-    [projectId, threadId],
-  );
+  const routeScope = useRouteDraftScope(projectId, threadId);
   const routeDraft = usePromptDraftController(routeScope);
   const draftSource = useComposerDraftSource(composerHost, routeDraft);
   const draftSnapshot = useCallback(

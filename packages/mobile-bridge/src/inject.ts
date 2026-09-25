@@ -33,9 +33,10 @@ export function buildBridgeInjectionScript(
     var post = function (message) {
       try {
         window.ReactNativeWebView.postMessage(JSON.stringify(message));
+        return true;
       } catch (error) {
-        // A navigation can tear the bridge down mid-call. Losing a haptic is
-        // never worth an exception in the page.
+        console.warn("bb native bridge post failed", error);
+        return false;
       }
     };
 
@@ -69,7 +70,7 @@ export function buildBridgeInjectionScript(
           try {
             listeners[i](event);
           } catch (error) {
-            // One bad listener must not stop the others.
+            console.error("bb native bridge listener failed", error);
           }
         }
       },
@@ -84,7 +85,11 @@ export function buildBridgeInjectionScript(
             reject(new Error("native request timed out"));
           }, 10000);
           pending[id] = { resolve: resolve, reject: reject, timer: timer };
-          post({ type: "request", id: id, request: { kind: kind, payload: payload } });
+          if (!post({ type: "request", id: id, request: { kind: kind, payload: payload } })) {
+            clearTimeout(timer);
+            delete pending[id];
+            reject(new Error("native bridge unavailable"));
+          }
         });
       },
       subscribe: function (listener) {
@@ -98,7 +103,7 @@ export function buildBridgeInjectionScript(
     native.__apply(handshake);
     root.native = native;
   } catch (error) {
-    // No bridge is a supported state. Leave the page alone.
+    console.warn("bb native bridge installation failed", error);
   }
 })();
 true;
@@ -111,7 +116,9 @@ export function buildBridgeEventScript(event: unknown): string {
   try {
     var native = window.${NATIVE_BRIDGE_GLOBAL} && window.${NATIVE_BRIDGE_GLOBAL}.native;
     if (native && native.__receive) native.__receive(${encodeForScript(event)});
-  } catch (error) {}
+  } catch (error) {
+    console.warn("bb native bridge event delivery failed", error);
+  }
 })();
 true;
 `;

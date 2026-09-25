@@ -654,7 +654,7 @@ plugin's settings page (Settings → Plugins → ACP providers); from the CLI:
 
 ```bash
 bb plugin config provider-acp set customAgents '[
-  {"id": "amp", "displayName": "Amp", "command": "amp", "args": ["acp"]}
+  {"id": "amp", "displayName": "Amp", "command": "amp", "args": ["acp"], "icon": "Sparkles"}
 ]'
 ```
 
@@ -666,7 +666,7 @@ lists only where the agent is installed (`opencode`, `omp`, `grok`,
 A replacing entry keeps the shipped agent's `nativeSkillRoots` unless it sets
 its own, and bb still lists the roots that agent's host config names (its
 config directory, compat trees, configured paths, plugins) either way.
-Optional fields: `args`, `env`, `cwd`, `modelCli` (CLI model listing and
+Optional fields: `icon`, `args`, `env`, `cwd`, `modelCli` (CLI model listing and
 selection), `reasoningCli` (launch-time reasoning flags), `nativeReasoning`
 (ACP `session/set_config_option` reasoning), `nativeSkillRoots` (native skills
 in the composer, as `{"user": [...], "project": [...]}` relative paths; an
@@ -676,6 +676,11 @@ an agent that nests skills or reads them from every ancestor directory),
 (only if the agent accepts an explicit compaction request — bb hides
 `/compact` otherwise), and `dialect` (the vendor side channels bb reads for
 the agent: `cursor`, `opencode`, `omp`, or `grok`).
+`icon` accepts a host glyph such as `Sparkles`, or an ACP provider mark:
+`provider-acp/claude`, `provider-acp/glm`, `provider-acp/cursor`,
+`provider-acp/opencode`, `provider-acp/omp`, `provider-acp/grok`, or
+`provider-acp/hermes-agent`. If omitted for a replacement of a shipped agent,
+the shipped icon is kept. Other custom agents use the Toolbox glyph by default.
 
 The change applies immediately: the plugin re-registers its providers when the
 setting changes, with no restart and no `config refresh`.
@@ -688,6 +693,16 @@ BB launches OpenCode sessions with `OPENCODE_CLIENT=acp` and
 values. Native questions have no ACP interaction handler in BB; agents use the
 ask-user-question plugin’s `AskUserQuestion` tool instead. This also applies to
 custom agents with `dialect: "opencode"` and does not change OpenCode config files.
+
+### The deprecated `customAcpAgents` config array
+
+Before ACP agents were plugin-owned, custom agents lived in `customAcpAgents`
+in `~/.bb/config.json`. bb still **reads** that array so an existing agent keeps
+working, logs a deprecation warning for each one, and never writes to it.
+Support ends in 0.41 — move each entry into the `customAgents` setting above.
+The old `logo` field is dropped when bb reads this array. Move the entry to the
+plugin setting and use `icon` to select a host glyph or an asset the ACP plugin
+ships. A setting entry wins over a config entry with the same `id`.
 
 ## OpenCode Go Usage
 

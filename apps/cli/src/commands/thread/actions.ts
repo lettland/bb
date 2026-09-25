@@ -682,7 +682,12 @@ async function withRestoreEnvironmentHint(
   if (!parsed.success || parsed.data.details.reason !== "destroyed") {
     return error;
   }
-  const { canRestoreEnvironment } = await sdk.threads.get({ threadId });
+  let canRestoreEnvironment: boolean;
+  try {
+    ({ canRestoreEnvironment } = await sdk.threads.get({ threadId }));
+  } catch {
+    return error;
+  }
   return new CliExitError(error.message, 1, {
     code: parsed.data.code,
     hint: canRestoreEnvironment

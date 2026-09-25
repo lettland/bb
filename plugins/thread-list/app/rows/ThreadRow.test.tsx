@@ -30,6 +30,8 @@ import { NO_COLLAPSED_CHILD_ACTIVITY } from "../model/thread-activity.js";
 import { makeSidebarThread } from "../model/fixtures.js";
 import { sidebarShowProviderIconsAtom } from "../preferences/atoms.js";
 import {
+  SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES,
+  SIDEBAR_RUNTIME_STATUS_COLOR_CLASS,
   SIDEBAR_SUCCESS_STATUS_COLOR_CLASS,
   SIDEBAR_WORKING_STATUS_COLOR_CLASS,
 } from "./sidebarRowClasses.js";
@@ -993,6 +995,9 @@ describe("ThreadRow", () => {
     const runningIcon = screen.getByLabelText("Thread working");
     expect(runningIcon.getAttribute("data-icon")).toBe("Loading");
     expect(Array.from(runningIcon.classList)).toContain("animate-spin");
+    expect(Array.from(runningIcon.classList)).toContain(
+      SIDEBAR_RUNTIME_STATUS_COLOR_CLASS,
+    );
     expect(screen.queryByLabelText("Plugin improving draft")).toBeNull();
     expect(
       container.querySelector("[data-sidebar-thread-trailing-indicator]"),
@@ -1416,7 +1421,7 @@ describe("ThreadRow", () => {
     expect(document.querySelector('[data-icon="Edit"]')).toBeNull();
   });
 
-  it("shows an animated working-colored workflow glyph for an idle thread with an active workflow", () => {
+  it("shows an animated workflow-colored glyph for an idle thread with an active workflow", () => {
     renderThreadRow({
       thread: createThread({ activity: activity({ workflows: 1 }) }),
     });
@@ -1424,53 +1429,56 @@ describe("ThreadRow", () => {
     const workflowIcon = screen.getByLabelText("Workflow running");
     const workflowIconClasses = Array.from(workflowIcon.classList);
     expect(workflowIconClasses).toContain("animate-shine-icon");
-    expect(workflowIconClasses).toContain(SIDEBAR_WORKING_STATUS_COLOR_CLASS);
+    expect(workflowIconClasses).toContain(
+      SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES.workflow,
+    );
     expect(screen.queryByLabelText("Agent working")).toBeNull();
   });
 
   it.each([
     {
       activityKey: "backgroundAgents" as const,
+      kind: "background-agent" as const,
       label: "Background agent running",
       icon: "UserRoundPlus",
       absent: ["Background command running", "Workflow running"],
     },
     {
       activityKey: "backgroundCommands" as const,
+      kind: "background-command" as const,
       label: "Background command running",
       icon: "Terminal",
       absent: ["Workflow running", "Agent working"],
     },
     {
       activityKey: "planMode" as const,
+      kind: "plan-mode" as const,
       label: "Plan mode active",
       icon: "ListTodo",
       absent: ["Background command running", "Workflow running"],
     },
     {
       activityKey: "goals" as const,
+      kind: "goal" as const,
       label: "Goal active",
       icon: "Target",
       absent: ["Plan mode active", "Workflow running"],
     },
-  ])(
-    "shows an animated $label glyph",
-    ({ activityKey, label, icon, absent }) => {
-      renderThreadRow({
-        thread: createThread({ activity: activity({ [activityKey]: 1 }) }),
-      });
+  ])("shows an animated $label glyph", ({ activityKey, kind, label, icon, absent }) => {
+    renderThreadRow({
+      thread: createThread({ activity: activity({ [activityKey]: 1 }) }),
+    });
 
-      const glyph = screen.getByLabelText(label);
-      expect(glyph.getAttribute("data-icon")).toBe(icon);
-      expect(Array.from(glyph.classList)).toContain("animate-shine-icon");
-      expect(Array.from(glyph.classList)).toContain(
-        SIDEBAR_WORKING_STATUS_COLOR_CLASS,
-      );
-      for (const missing of absent) {
-        expect(screen.queryByLabelText(missing)).toBeNull();
-      }
-    },
-  );
+    const glyph = screen.getByLabelText(label);
+    expect(glyph.getAttribute("data-icon")).toBe(icon);
+    expect(Array.from(glyph.classList)).toContain("animate-shine-icon");
+    expect(Array.from(glyph.classList)).toContain(
+      SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES[kind],
+    );
+    for (const missing of absent) {
+      expect(screen.queryByLabelText(missing)).toBeNull();
+    }
+  });
 
   it("shows workflow before background agent and command work", () => {
     renderThreadRow({

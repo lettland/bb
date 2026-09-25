@@ -198,20 +198,6 @@ export const systemUserQuestionLifecycleEventDataSchema = z.object({
   payload: userQuestionPendingInteractionPayloadSchema,
 });
 
-const systemThreadInterruptedReasonValues = [
-  "manual-stop",
-  "host-daemon-restarted",
-  "host-removed",
-  "provider-turn-idle",
-  "question-unanswered",
-] as const;
-export const systemThreadInterruptedReasonSchema = z.enum(
-  systemThreadInterruptedReasonValues,
-);
-export type SystemThreadInterruptedReason = z.infer<
-  typeof systemThreadInterruptedReasonSchema
->;
-
 export const systemThreadInterruptedEventDataSchema = z.object({
   reason: systemThreadInterruptedReasonSchema,
   cause: z.literal("host-connection-lost").optional(),

@@ -74,6 +74,7 @@ import type { FileOpenerOverride } from "@/lib/plugin-slot-resolvers";
 import { usePluginNewThreadPanelActions } from "@/components/plugin/PluginPanelActions";
 import { usePluginSlots } from "@/lib/plugin-slots";
 import { useCreateThread } from "@/hooks/mutations/thread-runtime-mutations";
+import { getPromptDraftAccessor } from "@/hooks/usePromptDraftStorage";
 import {
   useCloseTerminal,
   useCloseEnvironmentTerminal,
@@ -529,7 +530,7 @@ export function RootComposeView() {
     <NewThreadComposer
       projectId={rootComposeProjectId}
       onProjectChange={setRootComposeProjectId}
-      draftStorage={{ kind: "new-thread" }}
+      draftStorage={{ kind: "new-thread", projectId: rootComposeProjectId }}
       selectionScope="new-thread"
       seed={composerSeed}
       resetKey={handoffSeed?.sourceThreadId ?? null}
@@ -651,7 +652,6 @@ function RootComposeSurface({
   const searchInitialDraft = useInitialPromptDraft(searchInitialPrompt);
   const stateInitialDraft = useInitialPromptDraft(stateInitialPrompt);
   const setPromptDraft = composerActions.restoreDraft;
-  const getCurrentPromptDraft = promptDraft.getCurrent;
   const restorePromptDraftIfEmpty = promptDraft.restoreIfEmpty;
 
   useEffect(() => {
@@ -717,10 +717,15 @@ function RootComposeSurface({
           encodeReuseValue(nextHandoffSeed.environmentId),
         );
       }
-      setPromptDraft(
+      const handoffTargetDraft = getPromptDraftAccessor({
+        kind: "new-thread",
+        projectId: nextHandoffSeed.projectId,
+      });
+      handoffTargetDraft.setDraft(
         mergeThreadHandoffComposeDraft(
+          nextHandoffSeed,
           nextHandoffSeed.draft,
-          getCurrentPromptDraft(),
+          handoffTargetDraft.getCurrent(),
         ),
       );
     }
@@ -739,10 +744,8 @@ function RootComposeSurface({
     navigate,
     seedEnvironmentSelectionValue,
     selectHostForNewEnvironment,
-    getCurrentPromptDraft,
     setHandoffSeed,
     setPermissionMode,
-    setPromptDraft,
     setProviderModelReasoning,
     setRootComposeProjectId,
     setServiceTier,

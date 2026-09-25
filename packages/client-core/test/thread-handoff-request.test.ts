@@ -332,7 +332,7 @@ describe("mergeThreadHandoffComposeDraft", () => {
 
   it("uses the handoff draft when the composer draft is empty", () => {
     expect(
-      mergeThreadHandoffComposeDraft(handoffDraft, {
+      mergeThreadHandoffComposeDraft(SEED, handoffDraft, {
         text: "",
         mentions: [],
         attachments: [],
@@ -351,7 +351,7 @@ describe("mergeThreadHandoffComposeDraft", () => {
         label: "Other",
       },
     };
-    const merged = mergeThreadHandoffComposeDraft(handoffDraft, {
+    const merged = mergeThreadHandoffComposeDraft(SEED, handoffDraft, {
       text: "See @thread:thr_other",
       mentions: [existingMention],
       attachments: [],
@@ -369,5 +369,46 @@ describe("mergeThreadHandoffComposeDraft", () => {
     expect(merged.text.slice(shifted.start, shifted.end)).toBe(
       "@thread:thr_other",
     );
+  });
+
+  it("does not prepend the handoff twice when the seed is applied again", () => {
+    const seededDraft = {
+      text: "Continue from @thread:thr_source\n\nKeep going",
+      mentions: [SOURCE_MENTION],
+      attachments: [],
+    };
+    const once = mergeThreadHandoffComposeDraft(SEED, seededDraft, {
+      text: "Stale draft",
+      mentions: [],
+      attachments: [],
+    });
+    const twice = mergeThreadHandoffComposeDraft(SEED, seededDraft, once);
+
+    expect(twice).toBe(once);
+    expect(twice.text).toBe(
+      "Continue from @thread:thr_source\n\nKeep going\n\nStale draft",
+    );
+    expect(mergeThreadHandoffComposeDraft(SEED, seededDraft, seededDraft)).toBe(
+      seededDraft,
+    );
+  });
+
+  it("replaces a stale handoff prefix for the same source thread", () => {
+    const merged = mergeThreadHandoffComposeDraft(
+      SEED,
+      {
+        text: "Continue from @thread:thr_source\n\nnew",
+        mentions: [SOURCE_MENTION],
+        attachments: [],
+      },
+      {
+        text: "Continue from @thread:thr_source\n\nold",
+        mentions: [SOURCE_MENTION],
+        attachments: [],
+      },
+    );
+
+    expect(merged.text).toBe("Continue from @thread:thr_source\n\nnew\n\nold");
+    expect(merged.mentions).toEqual([SOURCE_MENTION]);
   });
 });

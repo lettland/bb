@@ -9,7 +9,9 @@ import {
 import type { PluginComposerThreadRowStatus } from "@get-bb/plugin-sdk";
 import { pluginIconName } from "@/components/plugin/PluginIcon";
 import {
+  SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES,
   SIDEBAR_STATUS_ICON_CLASS,
+  SIDEBAR_RUNTIME_STATUS_COLOR_CLASS,
   SIDEBAR_SUCCESS_STATUS_COLOR_CLASS,
   SIDEBAR_SUCCESS_STATUS_DOT_CLASS,
   SIDEBAR_WAITING_STATUS_COLOR_CLASS,
@@ -229,7 +231,7 @@ export function ThreadStatusGlyph({
           name={WORKING_ACTIVITY_ICONS[kind]}
           className={cn(
             "animate-shine-icon",
-            SIDEBAR_WORKING_STATUS_COLOR_CLASS,
+            SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES[kind],
             iconSizeClass,
           )}
           aria-label={getThreadListIndicatorLabel(kind) ?? undefined}
@@ -241,7 +243,7 @@ export function ThreadStatusGlyph({
           name="Loading"
           className={cn(
             "animate-spin motion-reduce:animate-none",
-            SIDEBAR_WORKING_STATUS_COLOR_CLASS,
+            SIDEBAR_RUNTIME_STATUS_COLOR_CLASS,
             iconSizeClass,
           )}
           aria-label={getThreadListIndicatorLabel(kind) ?? undefined}

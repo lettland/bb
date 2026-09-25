@@ -94,6 +94,24 @@ describe("buildBridgeInjectionScript", () => {
     await expect(promise).rejects.toThrow("share sheet unavailable");
   });
 
+  it("rejects immediately when the native bridge cannot receive a request", async () => {
+    vi.useFakeTimers();
+    try {
+      const { native, fakeWindow } = installBridge();
+      fakeWindow.ReactNativeWebView.postMessage = () => {
+        throw new Error("bridge detached");
+      };
+      await expect(
+        Promise.race([
+          native.request("share", { text: "hello" }),
+          Promise.resolve("still pending"),
+        ]),
+      ).rejects.toThrow("native bridge unavailable");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("times out a request the shell never answers", async () => {
     vi.useFakeTimers();
     try {

@@ -13,8 +13,10 @@ import {
   usePromptDraftStorage,
 } from "./usePromptDraftStorage";
 
-const NEW_THREAD_DRAFT_KEY = "bb.promptbox.contents-draft-3";
-const LEGACY_PROJECT_DRAFT_KEY = "bb.promptbox.contents-proj_prompt-draft-3";
+const PROJECT_A_NEW_THREAD_DRAFT_KEY =
+  "bb.promptbox.contents-new-thread-proj_a-3";
+const PROJECT_B_NEW_THREAD_DRAFT_KEY =
+  "bb.promptbox.contents-new-thread-proj_b-3";
 
 function storedDraft(text: string): string {
   return JSON.stringify({ text, attachments: [] });
@@ -215,36 +217,40 @@ describe("usePromptDraftStorage", () => {
     getItem.mockRestore();
   });
 
-  it("uses project-agnostic storage for new-thread prompt contents", () => {
-    window.localStorage.setItem(
-      LEGACY_PROJECT_DRAFT_KEY,
-      storedDraft("project draft"),
-    );
-    window.localStorage.setItem(
-      NEW_THREAD_DRAFT_KEY,
-      storedDraft("global draft"),
+  it("keeps new-thread prompt contents separate per project", () => {
+    const { result, rerender } = renderHook(
+      ({ projectId }) =>
+        usePromptDraftStorage({ kind: "new-thread", projectId }),
+      { initialProps: { projectId: "proj_a" } },
     );
 
-    const { result } = renderHook(() =>
-      usePromptDraftStorage({ kind: "new-thread" }),
-    );
-
-    expect(result.current.storageKey).toBe(NEW_THREAD_DRAFT_KEY);
-    expect(result.current.text).toBe("global draft");
-
+    expect(result.current.storageKey).toBe(PROJECT_A_NEW_THREAD_DRAFT_KEY);
     act(() => {
       result.current.setDraft({
-        text: "updated global draft",
+        text: "project a draft",
         mentions: [],
         attachments: [],
       });
     });
 
-    expect(window.localStorage.getItem(NEW_THREAD_DRAFT_KEY)).toBe(
-      storedDraft("updated global draft"),
+    rerender({ projectId: "proj_b" });
+    expect(result.current.text).toBe("");
+
+    act(() => {
+      result.current.setDraft({
+        text: "project b draft",
+        mentions: [],
+        attachments: [],
+      });
+    });
+
+    rerender({ projectId: "proj_a" });
+    expect(result.current.text).toBe("project a draft");
+    expect(window.localStorage.getItem(PROJECT_A_NEW_THREAD_DRAFT_KEY)).toBe(
+      storedDraft("project a draft"),
     );
-    expect(window.localStorage.getItem(LEGACY_PROJECT_DRAFT_KEY)).toBe(
-      storedDraft("project draft"),
+    expect(window.localStorage.getItem(PROJECT_B_NEW_THREAD_DRAFT_KEY)).toBe(
+      storedDraft("project b draft"),
     );
   });
 

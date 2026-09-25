@@ -131,8 +131,7 @@ async function invokeBranchOperation(
           suggestedBranchName: operation.intent.target.name,
           attempt: 0,
           pathKey: operation.id,
-          rebuild: false,
-          previous: null,
+          ...{ rebuild: false, previous: null },
           experimental_claimPath: async (path) =>
             path === operation.path &&
             ownsBranchPromotionClaim(deps.db, operation),

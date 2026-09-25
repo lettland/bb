@@ -38,6 +38,7 @@ export const hostDaemonCommandQuiescePolicyByType = {
   "host.paths_exist": "allowed",
   "host.pick_folder": "allowed",
   "host.read_file": "allowed",
+  "host.read_file_chunk": "allowed",
   "host.read_file_relative": "allowed",
   "host.remove_path": "execution-start",
   "host.write_file": "execution-start",

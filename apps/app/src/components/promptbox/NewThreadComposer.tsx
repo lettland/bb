@@ -1439,6 +1439,10 @@ export function NewThreadComposer({
       ) {
         return "refused";
       }
+      if (draftStorage.kind === "new-thread") {
+        await onProjectChange(nextValue);
+        return "changed";
+      }
       const attachmentPaths = getProjectStoredPromptAttachmentPaths(
         promptDraft.getCurrent().attachments,
       );
@@ -1472,7 +1476,13 @@ export function NewThreadComposer({
         setIsCopyingAttachments(false);
       }
     },
-    [onProjectChange, projectId, promptDraft, snapshotDraftBeforeOptionChange],
+    [
+      draftStorage.kind,
+      onProjectChange,
+      projectId,
+      promptDraft,
+      snapshotDraftBeforeOptionChange,
+    ],
   );
   const handleProjectChange = useCallback(
     async (nextProjectId: string | null) => {

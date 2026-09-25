@@ -590,9 +590,7 @@ it.each([
         suggestedBranchName: "ignored",
         attempt: 1,
         pathKey: "promotion",
-        rebuild: false,
         experimental_claimPath: claim,
-        previous: null,
         report: { step() {}, log() {} },
         signal: new AbortController().signal,
       });

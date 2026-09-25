@@ -122,13 +122,31 @@ function joinPromptDrafts(
   };
 }
 
+function promptDraftStartsWith(
+  draft: PromptDraftState,
+  head: PromptDraftState,
+): boolean {
+  return (
+    draft.text.startsWith(head.text) &&
+    head.mentions.every((headMention) =>
+      draft.mentions.some(
+        (mention) => JSON.stringify(mention) === JSON.stringify(headMention),
+      ),
+    )
+  );
+}
+
 export function mergeThreadHandoffComposeDraft(
+  seed: ThreadHandoffCreateSeed,
   handoffDraft: PromptDraftState,
   existingDraft: PromptDraftState,
 ): PromptDraftState {
-  return isPromptDraftEmpty(existingDraft)
+  if (promptDraftStartsWith(existingDraft, handoffDraft)) return existingDraft;
+  const existingBody =
+    stripThreadHandoffPrefix(seed, existingDraft) ?? existingDraft;
+  return isPromptDraftEmpty(existingBody)
     ? handoffDraft
-    : joinPromptDrafts(handoffDraft, existingDraft);
+    : joinPromptDrafts(handoffDraft, existingBody);
 }
 
 export function stripThreadHandoffPrefix(

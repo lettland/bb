@@ -5,7 +5,7 @@ export const SPIKE_HARNESS = String.raw`
     try {
       window.ReactNativeWebView.postMessage(JSON.stringify(payload));
     } catch (error) {
-      // A page navigation can tear the bridge down mid-report.
+      console.warn("bb webview spike report failed", error);
     }
   };
   var marks = {};

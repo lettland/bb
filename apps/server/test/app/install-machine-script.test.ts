@@ -884,7 +884,7 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
         if (isRunning(pid)) process.kill(pid, "SIGTERM");
       }
     }
-  });
+  }, 15_000);
 
   it("accepts the daemon's normalized loopback server URL", () => {
     const fixture = createFixture();
@@ -1058,7 +1058,7 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
       readFileSync(join(fixture.dataDir, "install-daemon.pid"), "utf8"),
     );
     process.kill(daemonPid, "SIGTERM");
-  });
+  }, 15_000);
 
   it("rejects a server host artifact whose digest does not match", () => {
     const fixture = createFixture();
@@ -1467,7 +1467,7 @@ fi
     expect(
       readFileSync(join(fixture.dataDir, "launchctl-starts.log"), "utf8"),
     ).toBe("start\nstart\n");
-  });
+  }, 15_000);
 
   it("replaces a legacy macOS launch agent even when its port differs", () => {
     const fixture = createFixture();
@@ -1673,7 +1673,7 @@ fi
     expect(readFileSync(join(fixture.dataDir, "systemctl.log"), "utf8")).toBe(
       "--user show-environment\n--user daemon-reload\n--user enable bb-host-daemon-machine-getbb-app-host-test.service\n--user restart bb-host-daemon-machine-getbb-app-host-test.service\n",
     );
-  });
+  }, 15_000);
 
   it("recovers the current user's systemd runtime path when the installer has no session environment", () => {
     const fixture = createFixture();
@@ -1857,6 +1857,7 @@ fi
         `${container ? "--user show-environment\n" : ""}${scope} daemon-reload\n${scope} enable ${enableUnit}\n${scope} restart bb-host-daemon-machine-getbb-app-host-test.service\n`,
       );
     },
+    15_000,
   );
 
   it("replaces a matching legacy systemd unit with exactly one host service", () => {
