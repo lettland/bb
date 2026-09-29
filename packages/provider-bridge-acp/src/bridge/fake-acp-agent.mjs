@@ -71,7 +71,8 @@
  */
 
 import { createInterface } from "node:readline";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const failLoad = process.env.FAKE_ACP_FAIL_LOAD === "1";
 const loadSession = process.env.FAKE_ACP_LOAD_SESSION === "1" || failLoad;
@@ -489,6 +490,35 @@ async function handlePrompt(message) {
       outcome = "error";
     }
     notifyUpdate(messageChunk(`permission:${outcome}`));
+  } else if (text.includes("claude-bash")) {
+    notifyUpdate({
+      sessionUpdate: "tool_call",
+      toolCallId: "toolu_bash_1",
+      name: "Bash",
+      title: "Terminal",
+      kind: "execute",
+      status: "pending",
+      rawInput: {},
+    });
+    await sleep(100);
+    const tasksDir = join(
+      process.env.CLAUDE_CODE_TMPDIR,
+      `claude-${process.getuid?.() ?? 0}`,
+      "-fake-project",
+      activeSessionId,
+      "tasks",
+    );
+    mkdirSync(tasksDir, { recursive: true });
+    writeFileSync(join(tasksDir, "b0fake001.output"), "live tick\n");
+    await sleep(1_500);
+    notifyUpdate({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "toolu_bash_1",
+      status: "completed",
+      content: [
+        { type: "content", content: { type: "text", text: "live tick\n" } },
+      ],
+    });
   } else if (text.includes("request-permission")) {
     notifyUpdate({
       sessionUpdate: "tool_call",
@@ -632,6 +662,14 @@ async function handleMessage(message) {
           },
           ...(authMethods.length > 0
             ? { authMethods: authMethods.map((id) => ({ id })) }
+            : {}),
+          ...(process.env.FAKE_ACP_AGENT_NAME
+            ? {
+                agentInfo: {
+                  name: process.env.FAKE_ACP_AGENT_NAME,
+                  version: "0.0.0",
+                },
+              }
             : {}),
         },
       });

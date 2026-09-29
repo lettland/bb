@@ -1,5 +1,6 @@
 import {
   EMPTY_PROVIDER_NATIVE_ROOTS,
+  isImageDataUri,
   isNamespacedGlyph,
   isPluginOwnedIconPath,
 } from "@bb/domain";
@@ -109,6 +110,14 @@ export function projectFallbackModels(
   }));
 }
 
+function isHostGlyph(icon: string): boolean {
+  return (
+    !isPluginOwnedIconPath(icon) &&
+    !isNamespacedGlyph(icon) &&
+    !isImageDataUri(icon)
+  );
+}
+
 function buildProviderLogoUrl(
   providerId: string,
   iconHash: string | null,
@@ -164,14 +173,10 @@ export function buildPluginProviderRegistration(args: {
     available: args.available,
     maintenance: { ...declaration.maintenance },
     logoUrl:
-      declaration.icon !== undefined &&
-      (isPluginOwnedIconPath(declaration.icon) ||
-        isNamespacedGlyph(declaration.icon))
+      declaration.icon !== undefined && !isHostGlyph(declaration.icon)
         ? buildProviderLogoUrl(declaration.id, args.iconHash)
         : null,
-    ...(declaration.icon !== undefined &&
-    !isPluginOwnedIconPath(declaration.icon) &&
-    !isNamespacedGlyph(declaration.icon)
+    ...(declaration.icon !== undefined && isHostGlyph(declaration.icon)
       ? { icon: { glyph: declaration.icon } }
       : {}),
     capabilities: {

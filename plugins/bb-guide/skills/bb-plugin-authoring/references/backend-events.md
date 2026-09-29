@@ -30,8 +30,7 @@ Fourteen events. The seven `thread.*` ones are thread lifecycle. `interaction.pe
 fires after core commits a pending interaction row. The three `message.*`
 ones fire when a dispatch is queued behind a wait, when a queued row's waits
 all clear and it dispatches, or when the queued row is cancelled. Every listener sees every queued row, so a plugin
-that only wants its own filters on
-`entry.waitingOn?.kind === "plugin" && entry.waitingOn.pluginId === bb.pluginId`.
+that only wants its own filters on `entry.waitingOn?.kind === "plugin" && entry.waitingOn.pluginId === bb.pluginId`.
 `message.queued` fires again when a row's wait is rewritten, because a row that
 moved from one wait to another is news to whoever was waiting on the old one.
 
@@ -231,7 +230,8 @@ stays blocked from being re-asked in a loop.
 
 Register resource operations with `bb.experimental_environments.register`.
 `icon` accepts host glyphs, plugin-relative assets, and this plugin's declared
-namespaced icons, just like agent providers. The provider listing includes a
+namespaced icons, like agent providers (only agent providers also accept a
+base64 image data URI). The provider listing includes a
 hashed `logoUrl` for assets. `app.slots.experimental_providerIcon` can override
 an environment provider's icon with `providerKind: "environment"` and its `providerId`.
 

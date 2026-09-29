@@ -43,7 +43,8 @@ What lives here:
   `src/probe-capabilities.ts`).
 - `icons/` — the provider logos, declared in `package.json` under
   `bb.branding.experimental_icons` so the packaged build ships them. Custom
-  agents may select these marks or a host glyph with their `icon` field.
+  agents may select these marks, a host glyph, or their own image file or data
+  URI with their `icon` field.
 
 The kit itself, including the ACP wire schema, the delta translation, the
 per-agent dialects and the bridge process, is `packages/provider-bridge-acp`.

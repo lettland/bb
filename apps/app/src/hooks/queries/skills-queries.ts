@@ -1,4 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import type { DeleteSkillRequest, SkillSummary } from "@bb/server-contract";
 import { sdk } from "@/lib/sdk";
 import {
@@ -8,7 +15,12 @@ import {
   SKILL_CONTENT_QUERY_KEY,
   SKILL_FILES_QUERY_KEY,
 } from "@/hooks/queries/query-keys";
-import { invalidateProjectSkillsMutationQueries } from "@/hooks/cache-owners/skills-cache-effects";
+import {
+  invalidateProjectSkillsMutationQueries,
+  refreshProjectSkillsQueries,
+} from "@/hooks/cache-owners/skills-cache-effects";
+
+const INSTALL_REGISTRY_SKILL_MUTATION_KEY = ["skills-registry", "install"];
 
 export function useProjectSkills(projectId: string) {
   return useQuery({
@@ -102,4 +114,39 @@ export function useDeleteSkill(projectId: string) {
       invalidateProjectSkillsMutationQueries({ projectId, queryClient });
     },
   });
+}
+
+export function useInstallRegistrySkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: INSTALL_REGISTRY_SKILL_MUTATION_KEY,
+    meta: { errorMessage: "Failed to install skill." },
+    mutationFn: (registrySkillId: string) =>
+      sdk.skills.registry.install({ registrySkillId }),
+    onSuccess: () =>
+      refreshProjectSkillsQueries({
+        projectId: PERSONAL_PROJECT_ID,
+        queryClient,
+      }),
+  });
+}
+
+export function useInstallingRegistrySkillIds(): ReadonlySet<string> {
+  const variables = useMutationState({
+    filters: {
+      mutationKey: INSTALL_REGISTRY_SKILL_MUTATION_KEY,
+      status: "pending",
+    },
+    select: (mutation) => mutation.state.variables,
+  });
+  return useMemo(
+    () =>
+      new Set(
+        variables.filter(
+          (registrySkillId): registrySkillId is string =>
+            typeof registrySkillId === "string",
+        ),
+      ),
+    [variables],
+  );
 }

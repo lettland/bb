@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
 import { sdk } from "@/lib/sdk";
+import { appToast } from "@/components/ui/app-toast";
 import {
   buildRegistrySkillReferencePrompt,
   type RegistrySkill,
@@ -180,6 +181,8 @@ function renderRegistryBrowse(
       skills={[makeRegistrySkill()]}
       pendingSkillIds={new Set()}
       unknownInstallSkillIds={new Set()}
+      installedSkillIds={new Set()}
+      installingSkillIds={new Set()}
       isLoading={false}
       loadingMore={false}
       hasMore={false}
@@ -187,6 +190,7 @@ function renderRegistryBrowse(
       query=""
       onQueryChange={() => {}}
       onLoadMore={() => {}}
+      onInstall={() => {}}
       onFork={() => {}}
       onSelect={() => {}}
       {...overrides}
@@ -531,6 +535,8 @@ describe("SkillsOverview", () => {
             skills={[registrySkill]}
             pendingSkillIds={new Set()}
             unknownInstallSkillIds={new Set()}
+            installedSkillIds={new Set()}
+            installingSkillIds={new Set()}
             isLoading={false}
             loadingMore={false}
             hasMore={false}
@@ -538,6 +544,7 @@ describe("SkillsOverview", () => {
             query=""
             onQueryChange={() => {}}
             onLoadMore={() => {}}
+            onInstall={() => {}}
             onFork={() => {}}
             onSelect={() => {}}
           />
@@ -950,6 +957,78 @@ describe("SkillsLibrary registry detail lifecycle", () => {
       ).toBe(false);
     },
   );
+
+  it("installs a registry skill from Browse and marks it installed once the library lists it", async () => {
+    const registrySkill = makeRegistrySkill();
+    let installed = false;
+    vi.spyOn(sdk.skills, "list").mockImplementation(async () => ({
+      skills: installed
+        ? [
+            makeSkill({
+              name: registrySkill.skillId,
+              provider: null,
+              scope: "bb-user",
+              registrySkillId: registrySkill.id,
+              filePath: "/home/u/.bb/skills/useful-skill/SKILL.md",
+            }),
+          ]
+        : [],
+    }));
+    let finishInstall: () => void = () => {};
+    const install = vi.spyOn(sdk.skills.registry, "install").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishInstall = () => {
+            installed = true;
+            resolve({
+              ok: true,
+              filePath: "/home/u/.bb/skills/useful-skill/SKILL.md",
+            });
+          };
+        }),
+    );
+    const toastSuccess = vi.spyOn(appToast, "success");
+    stubRegistryFetch(registrySkill, { list: true });
+    const { wrapper: QueryClientWrapper } = createQueryClientTestHarness();
+    renderDom(
+      <MemoryRouter initialEntries={["/skills"]}>
+        <QueryClientWrapper>
+          <Routes>
+            <Route path="/skills" element={<SkillsLibrary />} />
+          </Routes>
+        </QueryClientWrapper>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Install Useful skill into bb",
+      }),
+    );
+    await waitFor(() =>
+      expect(install).toHaveBeenCalledWith({
+        registrySkillId: registrySkill.id,
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Install Useful skill into bb" })
+          .getAttribute("aria-busy"),
+      ).toBe("true"),
+    );
+
+    finishInstall();
+
+    const installedButton = await screen.findByRole("button", {
+      name: "Useful skill is installed in bb",
+    });
+    expect(installedButton.hasAttribute("disabled")).toBe(true);
+    expect(install).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("Installed Useful skill"),
+    );
+  });
 
   it("shows the lifetime install count, not the trending window the list ranks by", async () => {
     const trendingEntry = makeRegistrySkill({ installs: 42, summary: null });
@@ -1445,7 +1524,9 @@ describe("RegistrySkillDetailView reference creation", () => {
       },
       localSkill: null,
       localPath: null,
+      installing: false,
       onRetry: () => {},
+      onInstall: () => {},
       onFork,
       onEditLocalSkill: () => {},
     };
@@ -1471,6 +1552,11 @@ describe("RegistrySkillDetailView reference creation", () => {
         localPath="/home/u/.bb/skills/useful-skill/SKILL.md"
       />,
     );
+    expect(
+      screen
+        .getByRole("button", { name: "Useful skill is installed in bb" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     fireEvent.click(
       screen.getByRole("button", {
         name: "Fork Useful skill into a new bb skill",

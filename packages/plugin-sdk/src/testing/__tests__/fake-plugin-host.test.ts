@@ -1804,7 +1804,17 @@ describe("providers.register", () => {
         }),
       ),
     ).toThrow(/experimental_bridgeOptions\.timeout must be finite JSON/);
+    expect(() =>
+      register(agentDeclaration({ icon: "data:image/gif;base64,R0lGOD==" })),
+    ).toThrow(/icon data URI must be a base64 SVG, PNG, or WebP image/);
     expect(() => register(agentDeclaration({ icon: "Zap" }))).not.toThrow();
+  });
+
+  it("accepts an image data URI provider icon", () => {
+    const { bb, harness } = createFakePluginHost({ pluginId: "tooled" });
+    const icon = `data:image/svg+xml;base64,${btoa("<svg/>")}`;
+    bb.providers.register(agentDeclaration({ icon }));
+    expect(harness.registrations.providerRegistrations[0]?.icon).toBe(icon);
   });
 
   it("refuses a provider icon naming an undeclared or foreign icon, like production", () => {

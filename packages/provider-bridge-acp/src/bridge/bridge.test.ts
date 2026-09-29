@@ -2285,6 +2285,47 @@ describe("acp bridge", () => {
     expect(agentMessageTexts()).toContain("permission:always");
   });
 
+  it.each([
+    ["@agentclientprotocol/claude-agent-acp", "live tick\n"],
+    ["some-other-agent", ""],
+  ])(
+    "streams a running Bash task file only for claude-agent-acp (%s)",
+    async (agentName, expectedLiveOutput) => {
+      const claudeTmp = mkdtempSync(join(tmpdir(), "bb-acp-claude-tmp-"));
+      try {
+        const { providerThreadId } = await startThread({
+          permissionMode: "full",
+          permissionEscalation: "ask",
+          envVars: {
+            FAKE_ACP_AGENT_NAME: agentName,
+            CLAUDE_CODE_TMPDIR: claudeTmp,
+          },
+        });
+        const turnId = sendTurnRequest("turn/start", providerThreadId, {
+          input: [{ type: "text", text: "claude-bash", mentions: [] }],
+        });
+        await waitForResponse(turnId);
+        await waitForTurnCompleted();
+
+        expect(
+          threadEventsOfType("item/commandExecution/outputDelta")
+            .map((event) => event.delta)
+            .join(""),
+        ).toBe(expectedLiveOutput);
+        expect(
+          threadEventsOfType("item/completed").map((event) => event.item),
+        ).toContainEqual(
+          expect.objectContaining({
+            type: "commandExecution",
+            aggregatedOutput: "live tick\n",
+          }),
+        );
+      } finally {
+        rmSync(claudeTmp, { recursive: true, force: true });
+      }
+    },
+  );
+
   it.each(["add", "update"])("acknowledges fs %s writes", async (kind) => {
     const targetPath = join(workspaceDir, "agent-output.txt");
     if (kind === "update") {

@@ -3,7 +3,7 @@ import { atomWithStorage } from "jotai/utils";
 import { atomFamily } from "jotai-family";
 import { useCallback } from "react";
 import type { PermissionMode, ReasoningLevel, ServiceTier } from "@bb/domain";
-import { createTabScopedStorage } from "@/lib/browser-storage";
+import { createTabScopedStorage, withLocalStorage } from "@/lib/browser-storage";
 import { getProjectScopedStorageKey } from "@/lib/project-scoped-storage";
 
 const MODEL_STORAGE_KEY = "bb.promptbox.model";
@@ -107,20 +107,43 @@ function getProviderSelectionStorageKey(
   return `${storageKey}-${encodeURIComponent(providerId.trim())}-${PROVIDER_SELECTION_STORAGE_VERSION}`;
 }
 
-const providerReasoningStorage = createTabScopedStorage<StoredReasoningLevel>(
-  {
-    parse: (value, initialValue) =>
-      value !== null && isStoredReasoningLevel(value) ? value : initialValue,
-    serialize: (value) => value,
-  },
-  { persistInitialValue: true },
-);
+function getLegacyProviderSelection(
+  providerId: string,
+  storageKey: string,
+): string | null {
+  return withLocalStorage((storage) => {
+    if (storage.getItem(PROVIDER_STORAGE_KEY) !== providerId) return null;
+    return storage.getItem(storageKey);
+  }, null);
+}
+
+function createProviderSelectionStorage<Value extends string>(
+  providerId: string,
+  storageKey: string,
+  parse: (value: string | null, initialValue: Value) => Value,
+) {
+  return createTabScopedStorage<Value>(
+    {
+      parse: (storedValue, initialValue) =>
+        parse(
+          storedValue ?? getLegacyProviderSelection(providerId, storageKey),
+          initialValue,
+        ),
+      serialize: (value) => value,
+    },
+    { persistInitialValue: true },
+  );
+}
 
 const modelAtomFamily = atomFamily((providerId: string) =>
   atomWithStorage<string>(
     getProviderSelectionStorageKey(MODEL_STORAGE_KEY, providerId),
     "",
-    stringSelectionStorage,
+    createProviderSelectionStorage(
+      providerId,
+      MODEL_STORAGE_KEY,
+      (value, initialValue) => value ?? initialValue,
+    ),
     { getOnInit: true },
   ),
 );
@@ -140,7 +163,12 @@ const reasoningLevelAtomFamily = atomFamily((providerId: string) =>
   atomWithStorage<StoredReasoningLevel>(
     getProviderSelectionStorageKey(REASONING_STORAGE_KEY, providerId),
     "",
-    providerReasoningStorage,
+    createProviderSelectionStorage<StoredReasoningLevel>(
+      providerId,
+      REASONING_STORAGE_KEY,
+      (value, initialValue) =>
+        value !== null && isStoredReasoningLevel(value) ? value : initialValue,
+    ),
     { getOnInit: true },
   ),
 );

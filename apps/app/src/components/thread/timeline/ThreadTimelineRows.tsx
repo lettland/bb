@@ -75,6 +75,7 @@ import { TimelineSelectionMenu } from "./TimelineSelectionMenu.js";
 import type { MessageProseSelection } from "./SelectableMessageProse.js";
 import { TimelineReasoningDetail } from "./TimelineReasoningDetail.js";
 import { ExpandableTimelineRow } from "./ExpandableTimelineRow.js";
+import { TimelineRowTime } from "./TimelineRowTime.js";
 import {
   TimelineLeadingIcon,
   TimelineStaticRowHeader,
@@ -1542,6 +1543,7 @@ function TimelineRowView({
             })}
           >
             <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+              <TimelineRowTime timestamp={row.startedAt} />
               <Icon
                 name={activityIntentTitleGlyph(entry)}
                 className="size-3.5 shrink-0 text-muted-foreground"
@@ -1573,6 +1575,7 @@ function TimelineRowView({
         })}
       >
         <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+          <TimelineRowTime timestamp={row.startedAt} />
           <TimelineLeadingIcon
             icon={staticLeadingIcon}
             iconUrl={staticLeadingIconUrl}
@@ -1649,6 +1652,7 @@ function TimelineExpandableRowView({
           : undefined
       }
       title={title}
+      startedAt={row.startedAt}
       summaryClassName={pastRowDimClassName({
         activeLatestBundleId,
         row,

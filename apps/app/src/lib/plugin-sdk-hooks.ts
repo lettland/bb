@@ -81,7 +81,6 @@ import { wsManager } from "@/lib/ws";
 import { pluginSdkSettingsQueryKey } from "@/hooks/queries/query-keys";
 import { useAppNavigationHost } from "@/lib/app-navigation-host";
 import { normalizeExperimentalFileOpenOptions } from "@/lib/live-file-navigation";
-import { deprecatedAlias } from "@/lib/plugin-sdk-deprecated-aliases";
 import { useRootComposeProjectId } from "@/lib/root-compose-selection";
 import {
   getPluginFixedTabOwnerId,

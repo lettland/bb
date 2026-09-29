@@ -114,7 +114,6 @@ function buildFocusLayout(
 
 export function ListView({ projectId, mode }: ListViewProps) {
   const navigation = useTasksNavigation();
-  const rpc = useTasksRpc();
   const openTask = useCallback(
     (taskKey: string) => navigation.go({ kind: "task", taskKey }),
     [navigation],

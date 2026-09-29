@@ -15,3 +15,12 @@ export function invalidateProjectSkillsMutationQueries({
     queryKeys: [projectSkillsQueryKey(projectId)],
   });
 }
+
+export function refreshProjectSkillsQueries({
+  projectId,
+  queryClient,
+}: ProjectSkillsInvalidationArg): Promise<void> {
+  return queryClient.invalidateQueries({
+    queryKey: projectSkillsQueryKey(projectId),
+  });
+}

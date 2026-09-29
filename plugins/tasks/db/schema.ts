@@ -267,6 +267,22 @@ export function initializeTasksSchema(db: PluginDatabase): void {
   );
 
   const migrate = db.transaction(() => {
+    if (hasVersion.get(7) && !hasVersion.get(8)) {
+      const hasArchivedAt = db
+        .prepare<[], { found: number }>(
+          "SELECT 1 AS found FROM pragma_table_info('tasks') WHERE name = 'archived_at'",
+        )
+        .get();
+      const hasTaskKeyAliases = db
+        .prepare<[], { found: number }>(
+          "SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = 'task_key_aliases'",
+        )
+        .get();
+      if (hasArchivedAt && !hasTaskKeyAliases) {
+        db.exec(MIGRATIONS[6]);
+        recordVersion.run(8, new Date().toISOString());
+      }
+    }
     for (const [index, sql] of MIGRATIONS.entries()) {
       const version = index + 1;
       if (hasVersion.get(version)) continue;

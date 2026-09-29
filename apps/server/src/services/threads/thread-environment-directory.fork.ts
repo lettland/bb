@@ -36,12 +36,11 @@ import {
 import { buildExecutionOptions } from "./thread-commands.js";
 import {
   getNonDestroyedHostWithStatus,
-  findHostDataDir,
   requirePublicProject,
 } from "../lib/entity-lookup.js";
 import { toThreadResponseFromThread } from "./thread-runtime-display.js";
 import { worktreeProviderInputs } from "./thread-environment-placement.js";
-import { suppliedWorkspacePathRefusal } from "./workspace-path-claims.js";
+import { foreignProjectOwnedPathRefusal } from "./workspace-path-claims.js";
 
 import {
   attachReadyEnvironment,
@@ -331,9 +330,7 @@ async function persistWorktreeEnvironment(
   deps: AppDeps,
   args: PersistWorktreeEnvironmentArgs,
 ): Promise<ReadyEnvironment | ToolCallResponse> {
-  const dataDir = findHostDataDir(deps, args.currentEnvironment.hostId);
-  const refusal = suppliedWorkspacePathRefusal(deps.db, {
-    dataDir,
+  const refusal = foreignProjectOwnedPathRefusal(deps.db, {
     hostId: args.currentEnvironment.hostId,
     path: args.created.path,
     projectId: args.thread.projectId,

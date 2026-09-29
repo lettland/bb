@@ -56,12 +56,15 @@ import {
 import {
   prefetchSkillDetail,
   useDeleteSkill,
+  useInstallingRegistrySkillIds,
+  useInstallRegistrySkill,
   useProjectSkills,
   useSkillContent,
   useSkillFiles,
 } from "@/hooks/queries/skills-queries";
 import { CreateWithTemplatesButton } from "@/components/create-via-prompt-examples";
 import { useLocalOpenTargets } from "@/hooks/useLocalOpenTargets";
+import { appToast } from "@/components/ui/app-toast";
 
 const EMPTY_SKILLS: readonly SkillSummary[] = [];
 
@@ -485,6 +488,25 @@ export function SkillsLibrary() {
     },
     [navigate],
   );
+  const { mutateAsync: installRegistrySkillAsync } = useInstallRegistrySkill();
+  const installingRegistrySkillIds = useInstallingRegistrySkillIds();
+  const installRegistrySkill = useCallback(
+    (skill: RegistrySkill) => {
+      installRegistrySkillAsync(skill.id)
+        .then(() => appToast.success(`Installed ${skill.name}`))
+        .catch(() => {});
+    },
+    [installRegistrySkillAsync],
+  );
+  const installedRegistrySkillIds = useMemo(
+    () =>
+      new Set(
+        registrySkills.flatMap((skill) =>
+          findLocalRegistrySkill(skill) === null ? [] : [skill.id],
+        ),
+      ),
+    [registrySkills, findLocalRegistrySkill],
+  );
   const registryDetail = registryDetailQuery.data ?? null;
   const selectedLocalRegistrySkill = selectedRegistrySkill
     ? findLocalRegistrySkill(selectedRegistrySkill)
@@ -549,7 +571,9 @@ export function SkillsLibrary() {
           detail={registryDetail}
           localSkill={selectedLocalRegistrySkill}
           localPath={selectedLocalRegistrySkill?.filePath ?? null}
+          installing={installingRegistrySkillIds.has(selectedRegistrySkill.id)}
           onRetry={() => void registryDetailQuery.refetch()}
+          onInstall={installRegistrySkill}
           onFork={forkRegistrySkill}
           onEditLocalSkill={editSkillViaThread}
         />
@@ -573,6 +597,8 @@ export function SkillsLibrary() {
               }
               pendingSkillIds={pendingRegistrySkillIds}
               unknownInstallSkillIds={unknownInstallSkillIds}
+              installedSkillIds={installedRegistrySkillIds}
+              installingSkillIds={installingRegistrySkillIds}
               isLoading={
                 registryQuery.isFetching && loadedRegistrySkills.length === 0
               }
@@ -592,6 +618,7 @@ export function SkillsLibrary() {
                   setRegistryPage((current) => current + 1);
                 }
               }}
+              onInstall={installRegistrySkill}
               onFork={forkRegistrySkill}
               onSelect={openRegistrySkill}
             />

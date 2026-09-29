@@ -2,9 +2,12 @@ import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import {
+  isImageDataUri,
   isNamespacedGlyph,
   isPluginOwnedIconPath,
+  parseImageDataUri,
   parseNamespacedGlyph,
+  PLUGIN_ICON_MAX_BYTES,
 } from "@bb/domain/plugin-icon";
 import { RESERVED_BB_CLI_COMMANDS } from "@bb/domain/plugin-cli";
 import {
@@ -1328,6 +1331,40 @@ function rejectStaleExperimentalFields(args: {
   }
 }
 
+function validateProviderDeclarationIcon(id: string, icon: unknown): string {
+  if (typeof icon !== "string" || icon.trim() === "") {
+    throw new Error(
+      `provider "${id}" icon must be a non-blank string — a named host glyph ("Zap"), a plugin-relative path ("./icons/agent.svg"), a declared icon ("<pluginId>/<name>"), or an image data URI ("data:image/svg+xml;base64,...")`,
+    );
+  }
+  // The `bb.branding.icon` forms plus two: a leading "./" means a
+  // plugin-owned file and gets the escape rules; "<pluginId>/<name>" names
+  // an entry of the plugin's `bb.branding.experimental_icons` map (the host
+  // checks the plugin id and the name at registration, since only it holds
+  // the manifest; `bb.branding.icon` itself refuses this form); a "data:"
+  // value carries image bytes a plugin read at runtime (a user-chosen
+  // icon); anything else names a host glyph. A path-shaped value that is
+  // none of these would otherwise be read as a glyph name that resolves to
+  // nothing.
+  if (isPluginOwnedIconPath(icon)) {
+    return validateProviderRelativePath(icon, `"${id}" icon`);
+  }
+  if (isImageDataUri(icon)) {
+    if (parseImageDataUri(icon) === null) {
+      throw new Error(
+        `provider "${id}" icon data URI must be a base64 SVG, PNG, or WebP image of at most ${PLUGIN_ICON_MAX_BYTES} bytes`,
+      );
+    }
+    return icon;
+  }
+  if (!isNamespacedGlyph(icon) && /[/\\]/u.test(icon)) {
+    throw new Error(
+      `provider "${id}" icon looks like a path but does not start with "./" — use "./icons/agent.svg" for a plugin file, "<pluginId>/<name>" for a declared icon, or a bare host glyph name like "Zap"`,
+    );
+  }
+  return icon;
+}
+
 export function validatePluginProviderDeclaration(
   declaration: PluginProviderDeclaration,
 ): NormalizedPluginProviderDeclaration {
@@ -1373,35 +1410,10 @@ export function validatePluginProviderDeclaration(
       `provider "${id}" displayName must be 1-${PLUGIN_PROVIDER_DISPLAY_NAME_MAX_CHARS} non-blank characters`,
     );
   }
-  let icon: string | undefined;
-  if (declaration.icon !== undefined) {
-    if (
-      typeof declaration.icon !== "string" ||
-      declaration.icon.trim() === ""
-    ) {
-      throw new Error(
-        `provider "${id}" icon must be a non-blank string — a named host glyph ("Zap"), a plugin-relative path ("./icons/agent.svg"), or a declared icon ("<pluginId>/<name>")`,
-      );
-    }
-    // The `bb.branding.icon` forms plus one: a leading "./" means a
-    // plugin-owned file and gets the escape rules; "<pluginId>/<name>" names
-    // an entry of the plugin's `bb.branding.experimental_icons` map (the host
-    // checks the plugin id and the name at registration, since only it holds
-    // the manifest; `bb.branding.icon` itself refuses this form); anything
-    // else names a host glyph. A path-shaped value that is neither would
-    // otherwise be read as a glyph name that resolves to nothing.
-    if (isPluginOwnedIconPath(declaration.icon)) {
-      icon = validateProviderRelativePath(declaration.icon, `"${id}" icon`);
-    } else if (isNamespacedGlyph(declaration.icon)) {
-      icon = declaration.icon;
-    } else if (/[/\\]/u.test(declaration.icon)) {
-      throw new Error(
-        `provider "${id}" icon looks like a path but does not start with "./" — use "./icons/agent.svg" for a plugin file, "<pluginId>/<name>" for a declared icon, or a bare host glyph name like "Zap"`,
-      );
-    } else {
-      icon = declaration.icon;
-    }
-  }
+  const icon =
+    declaration.icon === undefined
+      ? undefined
+      : validateProviderDeclarationIcon(id, declaration.icon);
   const capabilities = declaration.capabilities;
   if (typeof capabilities !== "object" || capabilities === null) {
     throw new Error(`provider "${id}" capabilities must be an object`);
@@ -2395,9 +2407,7 @@ export interface NormalizedPluginEnvironmentProvider {
     PluginEnvironmentProviderDeclaration["experimental_existingPath"]
   > | null;
   create: PluginEnvironmentProviderDeclaration["create"];
-  restore: NonNullable<
-    PluginEnvironmentProviderDeclaration["restore"]
-  > | null;
+  restore: NonNullable<PluginEnvironmentProviderDeclaration["restore"]> | null;
   remove: PluginEnvironmentProviderDeclaration["remove"];
   policy: import("../environment-provider.js").PluginEnvironmentProviderPolicy;
 }

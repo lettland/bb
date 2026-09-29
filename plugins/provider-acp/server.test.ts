@@ -256,6 +256,22 @@ describe("the ACP plugin's registration bookkeeping", () => {
     ).toBe(before);
   });
 
+  it("refuses to save an icon file that cannot be read", async () => {
+    const host = await loadPlugin({ customAgents: "[]" });
+
+    await expect(
+      host.harness.setSettings({
+        customAgents: customAgents({
+          id: "amp",
+          displayName: "Amp",
+          command: "amp",
+          icon: "/nonexistent/bb-acp-icon.svg",
+        }),
+      }),
+    ).rejects.toThrow(/icon file \/nonexistent\/bb-acp-icon\.svg/u);
+    expect(registeredIds(host)).not.toContain("acp-amp");
+  });
+
   it("serializes overlapping settings changes into one consistent state", async () => {
     const host = await loadPlugin({ customAgents: "[]" });
     const cursorBefore = host.harness.registrations.providerRegistrations.find(

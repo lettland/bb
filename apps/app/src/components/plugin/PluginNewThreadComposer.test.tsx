@@ -34,6 +34,7 @@ import type {
 } from "@bb/server-contract";
 import {
   NewThreadComposer,
+  type NewThreadComposerProps,
   type NewThreadComposerState,
 } from "@/components/promptbox/NewThreadComposer";
 import { setComposerSelectionSettleTimeoutForTest } from "@/components/promptbox/composer-selection-settle";
@@ -50,7 +51,7 @@ import {
 } from "@/hooks/usePromptDraftStorage";
 import { makeThreadListEntry } from "@bb/test-helpers/domain-fixtures";
 import { createDeferredPromise } from "@bb/test-helpers";
-import type { PromptDraftAttachment } from "@bb/client-core";
+import type { PromptDraftAttachment, PromptDraftState } from "@bb/client-core";
 import { makeProjectWithThreadsResponse } from "@/test/fixtures/projects";
 import { RootComposeView } from "@/views/RootComposeView";
 import { DefaultPaneContextProvider } from "@/views/thread-detail/PaneContext";
@@ -2730,9 +2731,11 @@ describe("NewThreadComposer setSelection", () => {
   function RootLikeComposer({
     initialProjectId,
     draftStorage,
+    carryDraftToProject,
   }: {
     initialProjectId: string;
     draftStorage?: PromptDraftScope;
+    carryDraftToProject?: NewThreadComposerProps["carryDraftToProject"];
   }) {
     const [projectId, setProjectId] = useState(initialProjectId);
     return (
@@ -2740,6 +2743,7 @@ describe("NewThreadComposer setSelection", () => {
         projectId={projectId}
         onProjectChange={setProjectId}
         draftStorage={draftStorage ?? { kind: "new-thread", projectId }}
+        carryDraftToProject={carryDraftToProject}
         selectionScope="new-thread"
         onSubmit={() => undefined}
       >
@@ -2890,6 +2894,65 @@ describe("NewThreadComposer setSelection", () => {
 
     expect(latestPromptBoxProps().value).toBe("proj_1 notes");
     expect(latestPromptBoxProps().attachments.items).toHaveLength(1);
+  });
+
+  it("carries the draft and its uploads to the selected project when asked", async () => {
+    mocks.copyAttachments.mockResolvedValue(undefined);
+    const attachment = {
+      type: "localFile" as const,
+      path: "uploads/spec.md",
+      name: "spec.md",
+      sizeBytes: 12,
+    };
+    getPromptDraftAccessor({
+      kind: "new-thread",
+      projectId: "proj_1",
+    }).setDraft({
+      text: "Continue from here",
+      mentions: [],
+      attachments: [attachment],
+    });
+    getPromptDraftAccessor({
+      kind: "new-thread",
+      projectId: "proj_2",
+    }).setDraft({ text: "proj_2 notes", mentions: [], attachments: [] });
+    const carryDraftToProject = vi.fn(
+      (draft: PromptDraftState, targetDraft: PromptDraftState) => ({
+        ...draft,
+        text: `${draft.text}\n\n${targetDraft.text}`,
+      }),
+    );
+    render(
+      <Provider>
+        <MemoryRouter>
+          <RootLikeComposer
+            initialProjectId="proj_1"
+            carryDraftToProject={carryDraftToProject}
+          />
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    await act(async () => {
+      await latestPromptBoxProps().project.onChange("proj_2");
+    });
+
+    expect(mocks.copyAttachments).toHaveBeenCalledWith({
+      projectId: "proj_2",
+      sourceProjectId: "proj_1",
+      paths: ["uploads/spec.md"],
+    });
+    expect(latestPromptBoxProps().project.value).toBe("proj_2");
+    expect(latestPromptBoxProps().value).toBe(
+      "Continue from here\n\nproj_2 notes",
+    );
+    expect(latestPromptBoxProps().attachments.items).toHaveLength(1);
+    expect(
+      getPromptDraftAccessor({
+        kind: "new-thread",
+        projectId: "proj_1",
+      }).getCurrent().text,
+    ).toBe("");
   });
 
   it("leaves the project alone when a copy or upload is in flight, and still applies the rest", async () => {

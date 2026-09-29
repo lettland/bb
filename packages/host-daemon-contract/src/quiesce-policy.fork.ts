@@ -24,7 +24,6 @@ export const hostDaemonCommandQuiescePolicyByType = {
   "environment.hook.run": "execution-start",
   "host.browse_directory": "allowed",
   "host.delete_skill": "execution-start",
-  "host.file_metadata": "allowed",
   "host.global_skills_status": "allowed",
   "host.inspect_git_source": "allowed",
   "host.install_global_skills": "execution-start",

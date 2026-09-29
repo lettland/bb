@@ -95,6 +95,7 @@ import { useQuickCreateProjectController } from "@/hooks/useQuickCreateProject";
 import {
   mergeThreadHandoffComposeDraft,
   readThreadHandoffComposeSeedFromLocationState,
+  type PromptDraftState,
   type ThreadHandoffComposeSeed,
 } from "@bb/client-core";
 import { useNavigateToThreadAfterCreatePreference } from "@/lib/root-compose-create-preference";
@@ -525,12 +526,21 @@ export function RootComposeView() {
         : buildHandoffComposerSeed(handoffSeed, rootComposeProjectId),
     [handoffSeed, rootComposeProjectId],
   );
+  const carryHandoffDraftToProject = useMemo(
+    () =>
+      handoffSeed === null
+        ? undefined
+        : (draft: PromptDraftState, targetDraft: PromptDraftState) =>
+            mergeThreadHandoffComposeDraft(handoffSeed, draft, targetDraft),
+    [handoffSeed],
+  );
 
   return (
     <NewThreadComposer
       projectId={rootComposeProjectId}
       onProjectChange={setRootComposeProjectId}
       draftStorage={{ kind: "new-thread", projectId: rootComposeProjectId }}
+      carryDraftToProject={carryHandoffDraftToProject}
       selectionScope="new-thread"
       seed={composerSeed}
       resetKey={handoffSeed?.sourceThreadId ?? null}

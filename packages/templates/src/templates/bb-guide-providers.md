@@ -201,7 +201,12 @@ Each entry needs id (lowercase letters, digits and dashes), displayName, and
 command. bb derives provider id acp-<id> from the slug id. The id is permanent.
 Optional icon selects a host glyph such as Sparkles or a bundled ACP mark such
 as provider-acp/claude or provider-acp/glm. Other bundled marks are cursor,
-opencode, omp, grok and hermes-agent under the provider-acp/ prefix. Without
+opencode, omp, grok and hermes-agent under the provider-acp/ prefix. For your
+own image, set icon to an absolute or ~/ path of an .svg, .png or .webp file of
+at most 32 KiB on the bb server machine, or to a base64 data:image/... URI. bb
+reads the file when the setting is saved or bb starts, and draws it as a
+single-color mask. Saving fails for a missing, unreadable or oversized file; a
+file removed later leaves the default icon. Without
 icon, a replacement keeps the shipped agent's mark; another custom agent uses
 the Toolbox glyph. The resulting icon or logo URL appears in
 bb provider list --json and the provider picker.

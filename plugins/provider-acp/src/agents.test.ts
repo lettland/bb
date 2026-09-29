@@ -67,26 +67,32 @@ describe("parseCustomAcpAgents", () => {
     expect(parsed.problems[0]).toContain("is not a valid agent");
   });
 
-  it.each(["Sparkles", "provider-acp/claude", "provider-acp/glm"])(
-    "accepts the configured icon %s",
-    (icon) => {
-      const parsed = parseCustomAcpAgents({
-        entries: [{ id: "amp", displayName: "Amp", command: "amp", icon }],
-        reservedProviderIds: reserved,
-      });
+  it.each([
+    "Sparkles",
+    "provider-acp/claude",
+    "provider-acp/glm",
+    "/opt/icons/amp.svg",
+    "~/icons/amp.png",
+    "data:image/webp;base64,UklGRg==",
+  ])("accepts the configured icon %s", (icon) => {
+    const parsed = parseCustomAcpAgents({
+      entries: [{ id: "amp", displayName: "Amp", command: "amp", icon }],
+      reservedProviderIds: reserved,
+    });
 
-      expect(parsed.problems).toEqual([]);
-      const [agent] = parsed.agents;
-      if (agent === undefined) throw new Error("expected the agent to parse");
-      expect(agent.icon).toBe(icon);
-      expect(customAcpAgentDefinition(agent).icon).toBe(icon);
-    },
-  );
+    expect(parsed.problems).toEqual([]);
+    const [agent] = parsed.agents;
+    if (agent === undefined) throw new Error("expected the agent to parse");
+    expect(agent.icon).toBe(icon);
+    expect(customAcpAgentDefinition(agent).icon).toBe(icon);
+  });
 
   it.each([
     "./icons/unknown.svg",
-    "/tmp/agent.svg",
+    "icons/agent.svg",
+    "/tmp/agent.gif",
     "https://example.com/icon.svg",
+    "data:image/gif;base64,R0lGOD==",
     "other-plugin/claude",
     "provider-acp/unknown",
   ])("rejects unsupported icon %s before registration", (icon) => {
@@ -216,8 +222,10 @@ describe("customAcpAgentDefinition", () => {
     expect(definition.icon).toBe(shipped.icon);
     expect(definition.iconTint).toEqual(shipped.iconTint);
     expect(
-      customAcpAgentDefinition({ ...agent, icon: "provider-acp/claude" }, shipped)
-        .iconTint,
+      customAcpAgentDefinition(
+        { ...agent, icon: "provider-acp/claude" },
+        shipped,
+      ).iconTint,
     ).toBeUndefined();
   });
 });
@@ -244,7 +252,8 @@ describe("custom agents that report usage", () => {
 
     expect(customAcpAgentDefinition(agent).providerUsage).toBe(true);
     expect(
-      acpProviderDeclaration(customAcpAgentDefinition(agent)).maintenance?.usage,
+      acpProviderDeclaration(customAcpAgentDefinition(agent)).maintenance
+        ?.usage,
     ).toBe(true);
   });
 
@@ -258,7 +267,8 @@ describe("custom agents that report usage", () => {
 
     expect(customAcpAgentDefinition(agent).providerUsage).toBeUndefined();
     expect(
-      acpProviderDeclaration(customAcpAgentDefinition(agent)).maintenance?.usage,
+      acpProviderDeclaration(customAcpAgentDefinition(agent)).maintenance
+        ?.usage,
     ).toBe(false);
   });
 });

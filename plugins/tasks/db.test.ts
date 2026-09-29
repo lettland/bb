@@ -375,6 +375,42 @@ describe("tasks storage", () => {
     }
   });
 
+  it("migrates fork version seven databases with archived tasks", async () => {
+    const { db, harness, store } = setup();
+    try {
+      const project = createProject(store, "FORK");
+      const task = store.createTask({
+        projectId: project.id,
+        title: "Archived before the rebase",
+        status: "done",
+      });
+      store.archiveTasks(project.id, [task.id]);
+      db.exec(`
+        DROP TABLE task_key_aliases;
+        DELETE FROM schema_version WHERE version = 8;
+      `);
+
+      const migrated = createTasksStore(db);
+      expect(migrated.getTask(task.id)?.archivedAt).not.toBeNull();
+      expect(
+        db
+          .prepare<[], { count: number }>(
+            "SELECT COUNT(*) AS count FROM schema_version",
+          )
+          .get()?.count,
+      ).toBe(8);
+      expect(
+        db
+          .prepare<[], { count: number }>(
+            "SELECT COUNT(*) AS count FROM task_key_aliases",
+          )
+          .get()?.count,
+      ).toBe(0);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
   it("paginates archived tasks and binds cursors to archive visibility", async () => {
     const { harness, store } = setup();
     try {

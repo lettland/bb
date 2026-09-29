@@ -92,6 +92,7 @@ import { useSidebarNavigation } from "@/hooks/queries/sidebar-navigation-query";
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 import { useCommandSuggestions } from "@/hooks/useCommandSuggestions";
 import {
+  getPromptDraftAccessor,
   usePromptDraftController,
   usePromptDraftInputEmpty,
   usePromptDraftSnapshot,
@@ -262,6 +263,10 @@ export interface NewThreadComposerProps {
   projectId: string | null;
   onProjectChange: (projectId: string) => void | Promise<void>;
   draftStorage: PromptDraftScope;
+  carryDraftToProject?: (
+    draft: PromptDraftState,
+    targetDraft: PromptDraftState,
+  ) => PromptDraftState;
   selectionScope: NewThreadComposerSelectionScope;
   seed?: NewThreadComposerSeed;
   resetKey?: string | number | null;
@@ -489,6 +494,7 @@ export function NewThreadComposer({
   projectId: requestedProjectId,
   onProjectChange,
   draftStorage,
+  carryDraftToProject,
   selectionScope,
   seed,
   resetKey,
@@ -1439,7 +1445,10 @@ export function NewThreadComposer({
       ) {
         return "refused";
       }
-      if (draftStorage.kind === "new-thread") {
+      if (
+        draftStorage.kind === "new-thread" &&
+        carryDraftToProject === undefined
+      ) {
         await onProjectChange(nextValue);
         return "changed";
       }
@@ -1468,7 +1477,21 @@ export function NewThreadComposer({
             return "refused";
           }
         }
-        snapshotDraftBeforeOptionChange();
+        if (draftStorage.kind === "new-thread" && carryDraftToProject) {
+          const targetDraft = getPromptDraftAccessor({
+            kind: "new-thread",
+            projectId: nextValue,
+          });
+          targetDraft.setDraft(
+            carryDraftToProject(
+              promptDraft.getCurrent(),
+              targetDraft.getCurrent(),
+            ),
+          );
+          promptDraft.clear();
+        } else {
+          snapshotDraftBeforeOptionChange();
+        }
         await onProjectChange(nextValue);
         return "changed";
       } finally {
@@ -1477,6 +1500,7 @@ export function NewThreadComposer({
       }
     },
     [
+      carryDraftToProject,
       draftStorage.kind,
       onProjectChange,
       projectId,
@@ -1812,7 +1836,9 @@ export function NewThreadComposer({
     ],
   );
   const { getSelection, subscribeSelection } = useComposerHostSelection(
-    promptDraft.storageKey,
+    draftStorage.kind === "new-thread"
+      ? draftStorage.kind
+      : promptDraft.storageKey,
     composerSelection,
   );
   const pendingSelectionRef = useRef<Promise<unknown>>(Promise.resolve());

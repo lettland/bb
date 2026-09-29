@@ -676,11 +676,18 @@ an agent that nests skills or reads them from every ancestor directory),
 (only if the agent accepts an explicit compaction request — bb hides
 `/compact` otherwise), and `dialect` (the vendor side channels bb reads for
 the agent: `cursor`, `opencode`, `omp`, or `grok`).
-`icon` accepts a host glyph such as `Sparkles`, or an ACP provider mark:
-`provider-acp/claude`, `provider-acp/glm`, `provider-acp/cursor`,
+`icon` accepts a host glyph such as `Sparkles`, an ACP provider mark
+(`provider-acp/claude`, `provider-acp/glm`, `provider-acp/cursor`,
 `provider-acp/opencode`, `provider-acp/omp`, `provider-acp/grok`, or
-`provider-acp/hermes-agent`. If omitted for a replacement of a shipped agent,
-the shipped icon is kept. Other custom agents use the Toolbox glyph by default.
+`provider-acp/hermes-agent`), or your own image: an absolute or `~/` path to an
+`.svg`, `.png`, or `.webp` file of at most 32 KiB on the machine running the bb
+server, or a `data:image/svg+xml;base64,...` (or `image/png`, `image/webp`) URI.
+bb reads the file when the setting changes or bb starts, so save the setting
+again after editing the file. The image is drawn as a single-color mask, like
+the bundled marks. Saving the setting fails when the icon file is missing,
+unreadable, or too large; if the file disappears later, the agent keeps its
+default icon and bb logs a warning. If omitted for a replacement of a shipped agent, the
+shipped icon is kept. Other custom agents use the Toolbox glyph by default.
 
 The change applies immediately: the plugin re-registers its providers when the
 setting changes, with no restart and no `config refresh`.

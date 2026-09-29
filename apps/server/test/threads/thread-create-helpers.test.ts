@@ -129,6 +129,8 @@ describe("createThreadRecord", () => {
               startedOnBehalfOf: null,
               titleFallback: null,
               visibility: "visible",
+              worktreePromotion: "declined",
+              promotionTarget: "worktree",
             },
           },
         );

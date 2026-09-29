@@ -6,6 +6,10 @@ import {
 } from "./desktop-browser-import.js";
 
 const id = z.string().min(1).max(256);
+const controllerLabel = z
+  .string()
+  .min(1)
+  .refine((value) => Array.from(value).length <= 256);
 export const desktopBrowserInstanceSchema = z.object({
   instanceId: id,
   generation: id,
@@ -13,7 +17,7 @@ export const desktopBrowserInstanceSchema = z.object({
 });
 export const desktopBrowserLeaseSchema = z.object({
   leaseId: id,
-  controllerLabel: z.string().min(1).max(256),
+  controllerLabel,
   expiresAt: z.number().int().positive(),
 });
 export type DesktopBrowserLease = z.infer<typeof desktopBrowserLeaseSchema>;
@@ -79,7 +83,7 @@ export const desktopBrowserCommandSchemas = {
       type: z.literal("desktop.browser.acquire_control"),
       ...leaseTarget,
       tabIds,
-      controllerLabel: z.string().min(1).max(256),
+      controllerLabel,
       expiresAt: z.number().int().positive(),
     })
     .strict(),

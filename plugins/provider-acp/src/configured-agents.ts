@@ -1,8 +1,10 @@
 import {
   customAcpAgentDefinition,
   formatCustomAcpProviderId,
+  loadCustomAgentIcon,
   parseCustomAcpAgents,
   type AcpAgentDefinition,
+  type CustomAcpAgent,
 } from "./agents.js";
 
 export interface ResolveConfiguredAcpAgentsArgs {
@@ -57,10 +59,28 @@ export function resolveConfiguredAcpAgents(
   return {
     agents: configured.agents.map((agent) =>
       customAcpAgentDefinition(
-        agent,
+        withLoadedIcon(agent, warnings),
         shippedById.get(formatCustomAcpProviderId(agent.id)),
       ),
     ),
     warnings,
   };
+}
+
+function withLoadedIcon(
+  agent: CustomAcpAgent,
+  warnings: string[],
+): CustomAcpAgent {
+  if (agent.icon === undefined) {
+    return agent;
+  }
+  const loaded = loadCustomAgentIcon(agent.icon);
+  if ("icon" in loaded) {
+    return { ...agent, icon: loaded.icon };
+  }
+  warnings.push(
+    `ACP custom agent setting: agent "${agent.id}" ${loaded.problem}; using its default icon`,
+  );
+  const { icon: _icon, ...withoutIcon } = agent;
+  return withoutIcon;
 }

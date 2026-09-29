@@ -351,6 +351,37 @@ describe("bb.providers.register (server)", () => {
     });
   });
 
+  it("serves a data URI icon through the provider logo route", async () => {
+    await withTestHarness(async (harness) => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><path d="M0 0h4v4z"/></svg>`;
+      const rootDir = await writePlugin(workDir, {
+        name: "bb-plugin-inline-agent",
+        serverSource: REGISTER_PROVIDER_SOURCE("inline-agent").replace(
+          '"./icons/agent.svg"',
+          JSON.stringify(
+            `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+          ),
+        ),
+      });
+      const entry = await harness.pluginService.installPath(rootDir);
+      expect(entry.status, entry.statusDetail ?? "").toBe("running");
+
+      const provider = (await listSystemProviderInfos(harness.deps, {})).find(
+        (info) => info.id === "inline-agent",
+      );
+      expect(provider?.icon).toBeUndefined();
+      expect(provider?.logoUrl).toMatch(
+        /^\/api\/v1\/system\/providers\/inline-agent\/logo\?h=/u,
+      );
+      const logo = await harness.app.request(
+        `http://127.0.0.1:3334${provider?.logoUrl ?? ""}`,
+      );
+      expect(logo.status).toBe(200);
+      expect(logo.headers.get("content-type")).toBe("image/svg+xml");
+      expect(await logo.text()).toBe(svg);
+    });
+  });
+
   it("serves a path-shaped icon as declared even when it carries an event handler", async () => {
     await withTestHarness(async (harness) => {
       const rootDir = await writePlugin(workDir, {

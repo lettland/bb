@@ -1754,14 +1754,16 @@ describe("internal event and tool-call routes", () => {
     return { currentEnvironment, host, project, session, thread };
   }
 
-  it("creates a worktree from the exact checkout and queues continuation", async () => {
+  it("creates a managed worktree from the exact checkout and queues continuation", async () => {
     await withTestHarness(async (harness) => {
+      const managedWorktreePath =
+        "/tmp/bb-host-data/host-enter-worktree/plugins/environment-git-worktree/host-data/worktrees/lazy-promotion/repo";
       const provider = installFakeGitWorktreeProvider(() => ({
         action: "ready",
         environment: {
           type: "host",
           hostId: "host-enter-worktree",
-          path: WORKTREE_PATH,
+          path: managedWorktreePath,
         },
       }));
       const { currentEnvironment, session, thread } = seedPromotableThread(
@@ -1783,7 +1785,7 @@ describe("internal event and tool-call routes", () => {
         arguments: {},
       });
       await reportNextEnvironmentAttachSuccess(harness, null, {
-        path: WORKTREE_PATH,
+        path: managedWorktreePath,
         isWorktree: true,
         branchName: "bb/lazy-worktree-promotion",
       });
@@ -1821,7 +1823,7 @@ describe("internal event and tool-call routes", () => {
         providerOwnsPath: true,
         status: "ready",
         isWorktree: true,
-        path: WORKTREE_PATH,
+        path: managedWorktreePath,
       });
       expect(enteredEnvironment?.environmentProviderSelection).toEqual({
         machine: { type: "existing", hostId: "host-enter-worktree" },

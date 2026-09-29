@@ -139,6 +139,19 @@ function useTimelineRowsWithPendingStop({
   }, [rows, isStopping, stoppingAnchorAt, threadId]);
 }
 
+function latestTimelineActivityAt(
+  rows: readonly TimelineRow[],
+): number | undefined {
+  const lastRow = rows.at(-1);
+  if (lastRow === undefined) {
+    return undefined;
+  }
+  if ("completedAt" in lastRow && lastRow.completedAt !== null) {
+    return lastRow.completedAt;
+  }
+  return lastRow.startedAt;
+}
+
 export function ThreadTimelineSurface({
   activeThinking,
   canSpawnChild,
@@ -195,6 +208,10 @@ export function ThreadTimelineSurface({
     showActiveThinking && activeThinking
       ? activeThinking.id
       : (ongoingIndicatorLabel ?? "working");
+  const ongoingIndicatorStartedAt =
+    showActiveThinking && activeThinking
+      ? activeThinking.startedAt
+      : latestTimelineActivityAt(timelineRows);
   const timelineRowsWithPendingStop = useTimelineRowsWithPendingStop({
     rows: timelineRows,
     isStopping,
@@ -280,6 +297,7 @@ export function ThreadTimelineSurface({
             key={ongoingIndicatorKey}
             details={activeThinkingDetails}
             reasoningId={activeThinking?.id}
+            startedAt={ongoingIndicatorStartedAt}
             isThinking={showActiveThinking}
             label={ongoingIndicatorLabel}
           />

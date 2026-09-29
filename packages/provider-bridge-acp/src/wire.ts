@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const claudeCodeParentMetaSchema = z.object({
+  _meta: z.object({
+    claudeCode: z.object({ parentToolUseId: z.string().min(1) }).passthrough(),
+  }),
+});
+
+export function claudeCodeParentToolUseId(
+  source: unknown,
+): string | undefined {
+  const meta = claudeCodeParentMetaSchema.safeParse(source);
+  return meta.success ? meta.data._meta.claudeCode.parentToolUseId : undefined;
+}
+
 const acpTextContentBlockSchema = z
   .object({
     type: z.literal("text"),
@@ -241,6 +254,7 @@ export const acpInitializeResultSchema = z
       .passthrough()
       .optional(),
     authMethods: z.array(z.object({ id: z.string() }).passthrough()).optional(),
+    agentInfo: z.object({ name: z.string() }).passthrough().optional(),
   })
   .passthrough();
 

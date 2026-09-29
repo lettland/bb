@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 import { ClaudeContextUsageCollector } from "./context-usage.js";
+import {
+  ClaudeBashOutputFollower,
+  claudeCodeTempRoot,
+} from "./bash-output-follower.js";
 
 import {
   type PendingInteractionGrantedPermissionProfile,
@@ -99,6 +103,13 @@ import {
   type ToolCallForwarder,
 } from "./tool-proxy-mcp.js";
 import { BB_BRIDGE_MCP_SERVER_NAME } from "../tool-classification.js";
+import {
+  claudeTaskNotificationMessageSchema,
+  claudeTaskStartedMessageSchema,
+  claudeTaskUpdatedMessageSchema,
+  claudeUserMessageSchema,
+} from "../schemas.js";
+import { extractToolResults } from "../sdk-extraction.js";
 import {
   type ClaudeInteractiveResponse,
   type ClaudePermissionMode,
@@ -224,6 +235,7 @@ interface ClaudeSessionRestart {
 
 interface ThreadSession {
   contextUsageCollector: ClaudeContextUsageCollector;
+  bashOutputFollower: ClaudeBashOutputFollower;
   session: SdkSession;
   attachment: ThreadAttachment;
   sessionSerial: number;
@@ -413,6 +425,7 @@ function resolvePendingSessionWork(
 ): void {
   toolCallTracker.resolvePendingToolCalls(threadSession, message);
   resolvePendingInteractiveRequests(threadSession, message);
+  threadSession.bashOutputFollower.stopAll();
 }
 
 function applyChromeSetting(
@@ -1073,6 +1086,20 @@ function createThreadSession(attachment: ThreadAttachment): ThreadSession {
   );
   const threadSession: ThreadSession = {
     contextUsageCollector: new ClaudeContextUsageCollector(),
+    bashOutputFollower: new ClaudeBashOutputFollower({
+      tempRoot: claudeCodeTempRoot(
+        attachment.sessionOptions.env ?? process.env,
+      ),
+      publish: (toolUseId, text) =>
+        sendThreadDeltas(attachment.threadIdRef.current, [
+          {
+            kind: "item.outputDelta",
+            key: { providerItemId: toolUseId },
+            channel: "command",
+            text,
+          },
+        ]),
+    }),
     session,
     attachment,
     sessionSerial,
@@ -1483,6 +1510,7 @@ function createOnSdkMessage(
       threadId: args.threadIdRef.current,
       message,
     });
+    followBashOutput(threadSession.bashOutputFollower, message);
     if (
       message.type === "result" ||
       (message.type === "system" &&
@@ -1539,6 +1567,53 @@ function createOnSdkMessage(
       );
     }
   };
+}
+
+function followBashOutput(
+  follower: ClaudeBashOutputFollower,
+  message: SDKMessage,
+): void {
+  const user = claudeUserMessageSchema.safeParse(message);
+  if (user.success) {
+    for (const result of extractToolResults(user.data)) {
+      follower.stop(result.toolUseId);
+    }
+    return;
+  }
+  const started = claudeTaskStartedMessageSchema.safeParse(message);
+  if (started.success) {
+    const task = started.data;
+    if (
+      task.task_type === "local_bash" &&
+      task.tool_use_id !== undefined &&
+      task.is_backgrounded !== true &&
+      message.session_id !== undefined
+    ) {
+      follower.follow({
+        toolUseId: task.tool_use_id,
+        taskId: task.task_id,
+        sessionId: message.session_id,
+      });
+    }
+    return;
+  }
+  const updated = claudeTaskUpdatedMessageSchema.safeParse(message);
+  if (updated.success) {
+    const { status, is_backgrounded } = updated.data.patch;
+    if (
+      is_backgrounded === true ||
+      status === "completed" ||
+      status === "failed" ||
+      status === "killed"
+    ) {
+      follower.stopTask(updated.data.task_id);
+    }
+    return;
+  }
+  const notified = claudeTaskNotificationMessageSchema.safeParse(message);
+  if (notified.success) {
+    follower.stopTask(notified.data.task_id);
+  }
 }
 
 function createOnSdkDone(

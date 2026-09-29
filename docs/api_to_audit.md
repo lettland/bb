@@ -1679,7 +1679,10 @@ bridge as provider-scoped static options. Core does not interpret its keys.
    glyph, or a `./`-prefixed plugin-relative SVG) plus the plugin's own
    declared icons as `"<pluginId>/<name>"` (`bb.branding.experimental_icons`;
    a foreign plugin id or an undeclared name is refused at the register
-   call). A path, or a declared icon's bytes, is snapshotted at registration
+   call), plus a base64 `data:image/{svg+xml,png,webp}` URI of at most 32 KiB
+   for artwork a plugin reads at runtime (the ACP plugin's user-chosen icon
+   files). A path, a declared icon's bytes, or a data URI's bytes is
+   snapshotted at registration
    and served from `/api/v1/system/providers/<id>/logo`; a host glyph name
    yields a null `logoUrl` and no server-side resolution at all. Decide
    whether the host should resolve declared glyph names for providers the way

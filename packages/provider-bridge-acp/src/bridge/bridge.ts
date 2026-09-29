@@ -91,6 +91,11 @@ import {
   getAcpProviderUsage,
 } from "./provider-maintenance.js";
 import {
+  CLAUDE_AGENT_ACP_PACKAGE,
+  ClaudeAgentBashOutputWatcher,
+  claudeCodeTempRoot,
+} from "./claude-bash-output.js";
+import {
   type AcpConfigOption,
   acpConfigStateResultSchema,
   acpPromptResultSchema,
@@ -99,6 +104,7 @@ import {
   acpSessionForkResultSchema,
   acpSessionNewResultSchema,
   acpSessionNotificationParamsSchema,
+  acpToolCallUpdateEventSchema,
   acpAgentMessageChunkUpdateSchema,
   extractAcpContentText,
   acpUsageUpdateSchema,
@@ -188,6 +194,7 @@ interface AcpThreadSession {
   pendingToolCalls: Set<AbortController>;
   cursorMcpApproval: CursorMcpApproval | undefined;
   deferStartEmit: AcpDeferredStartEmitter | undefined;
+  bashOutput: ClaudeAgentBashOutputWatcher | undefined;
 }
 
 type AcpDeferredStartEmitter = (
@@ -1610,6 +1617,7 @@ function liveSessionForThread(
 
 function removeSession(session: AcpThreadSession): void {
   for (const controller of session.pendingToolCalls) controller.abort();
+  session.bashOutput?.dispose();
   if (sessionsByBbThreadId.get(session.bbThreadId) === session) {
     sessionsByBbThreadId.delete(session.bbThreadId);
   }
@@ -1773,6 +1781,7 @@ async function startAgentSession(
     pendingToolCalls: new Set(),
     cursorMcpApproval: undefined,
     deferStartEmit: emitStartNotification,
+    bashOutput: undefined,
   };
   sessionsByBbThreadId.set(bbThreadId, session);
 
@@ -1920,6 +1929,24 @@ async function startAgentSession(
     }
     session.providerThreadId = sessionId;
     bbThreadIdByProviderThreadId.set(sessionId, bbThreadId);
+    if (initializeResult.agentInfo?.name === CLAUDE_AGENT_ACP_PACKAGE) {
+      session.bashOutput = new ClaudeAgentBashOutputWatcher({
+        tempRoot: claudeCodeTempRoot(childEnv),
+        sessionId,
+        publish: (toolCallId, text, parentRef) =>
+          sendThreadDeltas(bbThreadId, [
+            {
+              kind: "item.outputDelta",
+              key: {
+                providerItemId: toolCallId,
+                ...(parentRef === undefined ? {} : { parentRef }),
+              },
+              channel: "command",
+              text,
+            },
+          ]),
+      });
+    }
     sendNotification(BRIDGE_NOTIFICATION_METHODS.threadIdentity, {
       threadId: bbThreadId,
       providerThreadId: sessionId,
@@ -2311,6 +2338,20 @@ function handleAgentNotification(
     }
   }
   emitForSession(session, ACP_UPDATE_METHOD, update);
+  observeClaudeBashOutput(session, parsed.data.update);
+}
+
+function observeClaudeBashOutput(
+  session: AcpThreadSession,
+  update: unknown,
+): void {
+  if (session.bashOutput === undefined) {
+    return;
+  }
+  const toolCall = acpToolCallUpdateEventSchema.safeParse(update);
+  if (toolCall.success) {
+    session.bashOutput.observe(toolCall.data);
+  }
 }
 
 type DecodedAcpBridgeRequest =
