@@ -48,7 +48,7 @@ function toBbServiceTier(
   if (tier === null) {
     return "default";
   }
-  return tier === "fast" ? "fast" : null;
+  return tier;
 }
 
 export function toCodexExecutionDelta(
@@ -73,7 +73,7 @@ export function toCodexExecutionDelta(
 
 export interface CodexTurnExecutionSettings {
   model: string | undefined;
-  serviceTier: "fast" | null | undefined;
+  serviceTier: string | null | undefined;
   approvalPolicy: unknown;
   approvalsReviewer: string;
   sandboxType: string;

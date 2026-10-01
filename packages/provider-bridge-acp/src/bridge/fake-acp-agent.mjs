@@ -71,7 +71,7 @@
  */
 
 import { createInterface } from "node:readline";
-import { appendFileSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const failLoad = process.env.FAKE_ACP_FAIL_LOAD === "1";

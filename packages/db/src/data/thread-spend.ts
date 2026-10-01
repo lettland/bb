@@ -81,11 +81,7 @@ export function spendWeightedUnits(usage: SpendUsageBreakdown): number {
 
 export function normalizeSpendUsage(
   usage: SpendUsageBreakdown,
-  providerId: string,
 ): SpendUsageBreakdown {
-  if (providerId !== "codex") {
-    return usage;
-  }
   if (usage.cachedInputTokens <= 0) {
     return usage;
   }
@@ -161,8 +157,8 @@ export function foldTokenUsageObservation(
     return { next: state, contribution: null };
   }
 
-  const total = normalizeSpendUsage(observation.total, observation.providerId);
-  const last = normalizeSpendUsage(observation.last, observation.providerId);
+  const total = normalizeSpendUsage(observation.total);
+  const last = normalizeSpendUsage(observation.last);
   const disposition = classifyReading(state, total, last, options);
 
   const advanced: SpendCursorState = {

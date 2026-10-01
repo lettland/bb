@@ -500,12 +500,6 @@ export function createThreadEventPruningJob(
 
 const PERIODIC_SWEEP_JOBS: PeriodicSweepJob[] = [
   {
-    cadenceMs: 15_000,
-    category: "durable-intent-retry",
-    name: "branch-promotion-reconciliation",
-    run: reconcileBranchPromotions,
-  },
-  {
     cadenceMs: 0,
     category: "durable-intent-retry",
     name: "environment-provider-lifecycle",
@@ -628,6 +622,12 @@ const PERIODIC_SWEEP_JOBS: PeriodicSweepJob[] = [
     category: "orphan-cleanup",
     name: "thread-storage-orphan-cleanup",
     run: runThreadStorageOrphanSweep,
+  },
+  {
+    cadenceMs: 15_000,
+    category: "durable-intent-retry",
+    name: "branch-promotion-reconciliation",
+    run: reconcileBranchPromotions,
   },
   {
     cadenceMs: 60_000,

@@ -227,7 +227,7 @@ describe("spend fold", () => {
       reasoningOutputTokens: 0,
       totalTokens: 2_085_130,
     };
-    expect(normalizeSpendUsage(usage, "claude-code")).toEqual(usage);
+    expect(normalizeSpendUsage(usage)).toEqual(usage);
   });
 
   it("normalises a small cached prefix, and does so only once", () => {
@@ -238,9 +238,9 @@ describe("spend fold", () => {
       reasoningOutputTokens: 0,
       totalTokens: 26_499,
     };
-    const once = normalizeSpendUsage(reported, "codex");
+    const once = normalizeSpendUsage(reported);
     expect(once.inputTokens).toBe(21_475);
-    expect(normalizeSpendUsage(once, "codex")).toEqual(once);
+    expect(normalizeSpendUsage(once)).toEqual(once);
   });
 
   it("buckets by the local calendar day either side of midnight", () => {

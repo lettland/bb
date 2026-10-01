@@ -24,7 +24,7 @@ describe("toCodexExecutionDelta (get-bb/bb#1787)", () => {
     });
   });
 
-  it("leaves a setting bb has no word for as null instead of guessing", () => {
+  it("passes provider-defined service tiers through and leaves unmapped settings null", () => {
     expect(
       toCodexExecutionDelta({
         thread: { id: "codex-thread" },
@@ -41,7 +41,7 @@ describe("toCodexExecutionDelta (get-bb/bb#1787)", () => {
         model: "gpt-5.6-sol",
         reasoningLevel: null,
         permissionMode: null,
-        serviceTier: null,
+        serviceTier: "flex",
       },
     });
   });

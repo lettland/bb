@@ -230,10 +230,9 @@ stays blocked from being re-asked in a loop.
 
 Register resource operations with `bb.experimental_environments.register`.
 `icon` accepts host glyphs, plugin-relative assets, and this plugin's declared
-namespaced icons, like agent providers (only agent providers also accept a
-base64 image data URI). The provider listing includes a
-hashed `logoUrl` for assets. `app.slots.experimental_providerIcon` can override
-an environment provider's icon with `providerKind: "environment"` and its `providerId`.
+namespaced icons; only agent providers also accept a base64 image data URI.
+The provider listing includes a hashed `logoUrl` for assets, and
+`app.slots.experimental_providerIcon` can override an environment provider's icon with `providerKind: "environment"` and its `providerId`.
 
 ```ts
 bb.experimental_environments.register({

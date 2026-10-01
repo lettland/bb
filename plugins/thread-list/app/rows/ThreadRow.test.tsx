@@ -1464,21 +1464,24 @@ describe("ThreadRow", () => {
       icon: "Target",
       absent: ["Plan mode active", "Workflow running"],
     },
-  ])("shows an animated $label glyph", ({ activityKey, kind, label, icon, absent }) => {
-    renderThreadRow({
-      thread: createThread({ activity: activity({ [activityKey]: 1 }) }),
-    });
+  ])(
+    "shows an animated $label glyph",
+    ({ activityKey, kind, label, icon, absent }) => {
+      renderThreadRow({
+        thread: createThread({ activity: activity({ [activityKey]: 1 }) }),
+      });
 
-    const glyph = screen.getByLabelText(label);
-    expect(glyph.getAttribute("data-icon")).toBe(icon);
-    expect(Array.from(glyph.classList)).toContain("animate-shine-icon");
-    expect(Array.from(glyph.classList)).toContain(
-      SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES[kind],
-    );
-    for (const missing of absent) {
-      expect(screen.queryByLabelText(missing)).toBeNull();
-    }
-  });
+      const glyph = screen.getByLabelText(label);
+      expect(glyph.getAttribute("data-icon")).toBe(icon);
+      expect(Array.from(glyph.classList)).toContain("animate-shine-icon");
+      expect(Array.from(glyph.classList)).toContain(
+        SIDEBAR_ACTIVITY_STATUS_COLOR_CLASSES[kind],
+      );
+      for (const missing of absent) {
+        expect(screen.queryByLabelText(missing)).toBeNull();
+      }
+    },
+  );
 
   it("shows workflow before background agent and command work", () => {
     renderThreadRow({

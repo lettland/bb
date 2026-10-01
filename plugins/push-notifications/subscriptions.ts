@@ -10,7 +10,9 @@ import {
 const SUBSCRIPTION_KEY_PREFIX = "subscription:";
 
 export interface PushSubscriptionStore {
-  add(input: AddPushSubscriptionInput): Promise<{ id: string; created: boolean }>;
+  add(
+    input: AddPushSubscriptionInput,
+  ): Promise<{ id: string; created: boolean }>;
   list(): Promise<PushSubscription[]>;
   listSummaries(): Promise<PushSubscriptionSummary[]>;
   remove(id: string): Promise<boolean>;
@@ -59,8 +61,7 @@ export function createPushSubscriptionStore(
       return mutate(async () => {
         const subscriptions = await readAll();
         const existing = subscriptions.find(
-          (subscription) =>
-            subscription.expoPushToken === input.expoPushToken,
+          (subscription) => subscription.expoPushToken === input.expoPushToken,
         );
         const timestamp = now();
         if (existing) {

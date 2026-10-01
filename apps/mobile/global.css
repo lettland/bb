@@ -42,6 +42,12 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-text: var(--destructive-text);
   --color-attention: var(--attention);
+  --color-working: var(--working);
+  --color-working-plan: var(--working-plan);
+  --color-working-workflow: var(--working-workflow);
+  --color-working-agent: var(--working-agent);
+  --color-working-command: var(--working-command);
+  --color-working-goal: var(--working-goal);
   --color-warning: var(--warning);
   --color-warning-text: var(--warning-text);
   --color-success: var(--success);

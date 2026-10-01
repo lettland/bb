@@ -14,6 +14,26 @@ type PendingInteraction =
   PluginThreadEventPayloads["interaction.pending"]["interaction"];
 
 const COALESCE_MS = 10;
+const CHILD_STATES = [
+  { name: "starting", status: "starting", queued: "none", silent: true },
+  { name: "active", status: "active", queued: "none", silent: true },
+  { name: "stopping", status: "stopping", queued: "none", silent: true },
+  {
+    name: "pending+waiting",
+    status: "pending",
+    queued: "waiting",
+    silent: true,
+  },
+  { name: "idle", status: "idle", queued: "none", silent: false },
+  { name: "error", status: "error", queued: "none", silent: false },
+  { name: "pending+none", status: "pending", queued: "none", silent: false },
+  {
+    name: "pending+failed",
+    status: "pending",
+    queued: "failed",
+    silent: false,
+  },
+] as const;
 const EXPO_URL = "http://expo.test/push";
 
 interface FakeExpo {
@@ -94,6 +114,9 @@ async function setup(options: SetupOptions = {}) {
   const expo = options.expo ?? createFakeExpo();
   const threads = new Map<string, ThreadResponse>();
   const interactions = new Map<string, PendingInteraction[]>();
+  const queuedWork = new Map<string, "none" | "waiting" | "failed">();
+  const listCalls: (string | undefined)[] = [];
+  const listFailure: { error: Error | null } = { error: null };
   let nextId = 1;
   const fake = createFakePluginHost({
     pluginId: "push-notifications",
@@ -105,6 +128,23 @@ async function setup(options: SetupOptions = {}) {
           const thread = threads.get(threadId);
           if (!thread) throw new Error("Thread not found");
           return thread;
+        },
+        list: async (filter) => {
+          listCalls.push(filter?.parentThreadId);
+          if (listFailure.error) throw listFailure.error;
+          return [...threads.values()]
+            .filter(
+              (thread) =>
+                (filter?.parentThreadId === undefined ||
+                  thread.parentThreadId === filter.parentThreadId) &&
+                (filter?.archived !== false || thread.archivedAt === null) &&
+                (filter?.includeHidden === true ||
+                  thread.visibility === "visible"),
+            )
+            .map((thread) => ({
+              ...thread,
+              queuedWork: queuedWork.get(thread.id) ?? "none",
+            }));
         },
         interactions: {
           list: async ({ threadId }) => interactions.get(threadId) ?? [],
@@ -157,6 +197,9 @@ async function setup(options: SetupOptions = {}) {
     cleanup,
     expo,
     interactions,
+    listCalls,
+    listFailure,
+    queuedWork,
     setThread,
     threads,
   };
@@ -491,6 +534,167 @@ describe("push sender", () => {
       await waitForCoalesce();
       expect(host.expo.requests).toEqual([]);
       expect(host.harness.realtimeSignals).toEqual([]);
+    } finally {
+      await host.cleanup();
+    }
+  });
+
+  it.each(CHILD_STATES)(
+    "idle parent with a child that is $name: silent=$silent",
+    async ({ status, queued, silent }) => {
+      const host = await setup();
+      try {
+        await host.addSubscription();
+        const parent = host.setThread({ id: "parent" });
+        host.setThread({ id: "child", parentThreadId: parent.id, status });
+        host.queuedWork.set("child", queued);
+
+        await host.harness.behavior.emitThreadEvent("thread.idle", {
+          thread: parent,
+          lastAssistantText: "Parent turn done",
+        });
+        await vi.waitFor(() => expect(host.listCalls).toContain(parent.id));
+        if (silent) {
+          await waitForCoalesce();
+          expect(host.expo.requests).toEqual([]);
+          expect(host.harness.realtimeSignals).toEqual([]);
+        } else {
+          await vi.waitFor(() => expect(host.expo.requests).toHaveLength(1));
+          expect(host.expo.requests[0]?.[0]).toMatchObject({
+            body: "Parent turn done",
+            data: { kind: "turn-finished", threadId: parent.id },
+          });
+          expect(host.harness.realtimeSignals).toHaveLength(1);
+        }
+      } finally {
+        await host.cleanup();
+      }
+    },
+  );
+
+  it.each([
+    {
+      name: "an unrelated top-level thread",
+      overrides: { id: "other", status: "active" as const },
+    },
+    {
+      name: "another parent's child",
+      overrides: {
+        id: "other",
+        parentThreadId: "someone-else",
+        status: "active" as const,
+      },
+    },
+    {
+      name: "a hidden child",
+      overrides: {
+        id: "other",
+        parentThreadId: "parent",
+        status: "active" as const,
+        visibility: "hidden" as const,
+      },
+    },
+    {
+      name: "an archived child",
+      overrides: {
+        id: "other",
+        parentThreadId: "parent",
+        status: "active" as const,
+        archivedAt: 5,
+      },
+    },
+  ])("does not mute an idle parent because of $name", async ({ overrides }) => {
+    const host = await setup();
+    try {
+      await host.addSubscription();
+      const parent = host.setThread({ id: "parent" });
+      host.setThread(overrides);
+
+      await host.harness.behavior.emitThreadEvent("thread.idle", {
+        thread: parent,
+        lastAssistantText: "Parent turn done",
+      });
+      await vi.waitFor(() => expect(host.listCalls).toContain(parent.id));
+      await vi.waitFor(() => expect(host.expo.requests).toHaveLength(1));
+      expect(host.expo.requests[0]?.[0]).toMatchObject({
+        data: { kind: "turn-finished", threadId: parent.id },
+      });
+    } finally {
+      await host.cleanup();
+    }
+  });
+
+  it("fails open when the child lookup rejects", async () => {
+    const host = await setup();
+    try {
+      await host.addSubscription();
+      host.listFailure.error = new Error("list unavailable");
+      const parent = host.setThread({ id: "parent" });
+      host.setThread({
+        id: "child",
+        parentThreadId: parent.id,
+        status: "active",
+      });
+
+      await host.harness.behavior.emitThreadEvent("thread.idle", {
+        thread: parent,
+        lastAssistantText: "Parent turn done",
+      });
+      await vi.waitFor(() => expect(host.expo.requests).toHaveLength(1));
+      expect(host.expo.requests[0]?.[0]).toMatchObject({
+        body: "Parent turn done",
+        data: { kind: "turn-finished", threadId: parent.id },
+      });
+      expect(host.listCalls).toContain(parent.id);
+
+      const asking = host.setThread({ id: "asking" });
+      const interaction = pendingQuestion(asking.id, "Proceed?");
+      host.interactions.set(asking.id, [interaction]);
+      await host.harness.behavior.emitThreadEvent("thread.idle", {
+        thread: asking,
+        lastAssistantText: "Waiting",
+      });
+      await host.harness.behavior.emitThreadEvent("interaction.pending", {
+        thread: asking,
+        interaction,
+      });
+      await vi.waitFor(() => expect(host.expo.requests).toHaveLength(2));
+      expect(host.expo.requests[1]?.[0]).toMatchObject({
+        body: "Proceed?",
+        data: { kind: "pending-interaction", threadId: asking.id },
+      });
+    } finally {
+      await host.cleanup();
+    }
+  });
+
+  it("still sends the pending-interaction push for a parent with a running child", async () => {
+    const host = await setup();
+    try {
+      await host.addSubscription();
+      const parent = host.setThread({ id: "parent" });
+      host.setThread({
+        id: "child",
+        parentThreadId: parent.id,
+        status: "active",
+      });
+      const interaction = pendingQuestion(parent.id, "Proceed?");
+      host.interactions.set(parent.id, [interaction]);
+
+      await host.harness.behavior.emitThreadEvent("thread.idle", {
+        thread: parent,
+        lastAssistantText: "Waiting on the child",
+      });
+      await host.harness.behavior.emitThreadEvent("interaction.pending", {
+        thread: parent,
+        interaction,
+      });
+      await vi.waitFor(() => expect(host.expo.requests).toHaveLength(1));
+      expect(host.expo.requests[0]?.[0]).toMatchObject({
+        body: "Proceed?",
+        data: { kind: "pending-interaction", threadId: parent.id },
+      });
+      expect(host.listCalls).toEqual([]);
     } finally {
       await host.cleanup();
     }

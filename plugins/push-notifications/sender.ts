@@ -28,6 +28,11 @@ const PUSH_TITLE_MAX_LENGTH = 80;
 const PUSH_BODY_MAX_LENGTH = 180;
 const NETWORK_WARNING_INTERVAL_MS = 60 * 60 * 1_000;
 const LAST_OUTCOME_KEY = "last-send-outcome";
+const RUNNING_CHILD_STATUSES: ReadonlySet<ThreadResponse["status"]> = new Set([
+  "starting",
+  "active",
+  "stopping",
+]);
 const PUSH_KIND_PRIORITY: readonly PushNotificationKind[] = [
   "pending-interaction",
   "turn-watchdog",
@@ -280,6 +285,22 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
     });
   }
 
+  async function hasRunningChild(threadId: string): Promise<boolean> {
+    try {
+      const children = await bb.sdk.threads.list({
+        parentThreadId: threadId,
+        archived: false,
+      });
+      return children.some(
+        (child) =>
+          RUNNING_CHILD_STATUSES.has(child.status) ||
+          (child.status === "pending" && child.queuedWork === "waiting"),
+      );
+    } catch {
+      return false;
+    }
+  }
+
   async function resolvePush(
     thread: ThreadResponse,
     entry: PendingThreadPush,
@@ -303,6 +324,9 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
     }
     const kind = pickKind(kinds);
     if (kind === null) return null;
+    if (kind === "turn-finished" && (await hasRunningChild(thread.id))) {
+      return null;
+    }
     if (kind === "pending-interaction") {
       return {
         kind,

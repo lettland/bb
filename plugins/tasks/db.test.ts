@@ -387,7 +387,7 @@ describe("tasks storage", () => {
       store.archiveTasks(project.id, [task.id]);
       db.exec(`
         DROP TABLE task_key_aliases;
-        DELETE FROM schema_version WHERE version = 8;
+        DELETE FROM schema_version WHERE version IN (8, 9);
       `);
 
       const migrated = createTasksStore(db);
@@ -398,7 +398,7 @@ describe("tasks storage", () => {
             "SELECT COUNT(*) AS count FROM schema_version",
           )
           .get()?.count,
-      ).toBe(8);
+      ).toBe(9);
       expect(
         db
           .prepare<[], { count: number }>(
@@ -435,8 +435,7 @@ describe("tasks storage", () => {
       expect(first.tasks).toHaveLength(1);
       expect(first.nextCursor).not.toBeNull();
       const archivedCursor = first.nextCursor;
-      if (archivedCursor === null)
-        throw new Error("expected archived cursor");
+      if (archivedCursor === null) throw new Error("expected archived cursor");
       expect(
         store.listTasksPage({
           projectId: project.id,

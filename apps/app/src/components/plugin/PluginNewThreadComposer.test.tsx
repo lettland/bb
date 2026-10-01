@@ -757,7 +757,7 @@ describe("PluginNewThreadComposer seeding", () => {
           <NewThreadComposer
             projectId="proj_1"
             onProjectChange={() => undefined}
-            draftStorage={{ kind: "new-thread" }}
+            draftStorage={{ kind: "new-thread", projectId: "proj_1" }}
             selectionScope="new-thread"
             onSubmit={() => undefined}
           >
